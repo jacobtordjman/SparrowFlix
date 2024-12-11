@@ -1,0 +1,6 @@
+services:
+  - name: telegram-bot
+    type: worker  # Indicates this is a long-running background process
+    buildCommand: "pip install -r requirements.txt"  # Command to install dependencies
+    startCommand: "./start.sh"  # Command to start your bot
+    runtime: python  # Specifies the Python runtime
