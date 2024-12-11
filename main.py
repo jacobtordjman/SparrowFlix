@@ -346,6 +346,20 @@ def fetch_handler(message):
     bot.send_message(message.chat.id, "Choose a language to fetch titles:", reply_markup=keyboard)
     bot.register_next_step_handler(message, process_language_selection_for_fetch)
 
+
+def process_fetch_content_type(message, language):
+    logging.debug(f"Content type selection for fetch: {message.text}")
+    if handle_back(message, process_language_selection_for_fetch):
+        return
+    content_type = message.text.strip().lower()
+    if content_type not in ["movies", "tv shows"]:
+        bot.send_message(message.chat.id, "Invalid selection. Please choose Movies or TV Shows.")
+        process_language_selection_for_fetch(message)
+        return
+    # Call the method to fetch the appropriate content
+    process_fetch_filter_method(message, language, content_type)
+
+
 def process_language_selection_for_fetch(message):
     logging.debug(f"Language selection for fetch: {message.text}")
     if handle_back(message, start_handler):
@@ -355,32 +369,43 @@ def process_language_selection_for_fetch(message):
         bot.send_message(message.chat.id, "Invalid language selection. Try again.")
         fetch_handler(message)
         return
+    # Ask user whether they want Movies or TV Shows
+    options = ["Movies", "TV Shows", "Back"]
+    keyboard = create_keyboard(options)
+    bot.send_message(message.chat.id, "Do you want to fetch Movies or TV Shows?", reply_markup=keyboard)
+    bot.register_next_step_handler(message, process_fetch_content_type, language)
 
-def process_fetch_filter_method(message, language):
-    logging.debug(f"Fetch filter method selection: {message.text}")
-    if handle_back(message, process_language_selection_for_fetch, language):
-        return
-    choice = message.text.lower()
-    if choice == "categories":
-        bot.send_message(message.chat.id, "Fetching by categories is not implemented yet.")
-        fetch_handler(message)
-    elif choice == "all titles":
-        try:
-            titles = list(
-                tv_shows_collection.find({"language": language}) +
-                movies_collection.find({"language": language})
-            )
-            if not titles:
-                bot.send_message(message.chat.id, "No titles found. Please try another method.")
-                fetch_handler(message)
-                return
-            options = [title["title"] for title in titles] + ["Back"]
-            keyboard = create_keyboard(options)
-            bot.send_message(message.chat.id, "Select a title:", reply_markup=keyboard)
-            bot.register_next_step_handler(message, process_fetch_selection, titles)
-        except Exception as e:
-            logging.error(f"Error during fetching titles: {e}")
-            bot.send_message(message.chat.id, "An error occurred while fetching titles.")
+
+def process_fetch_filter_method(message, language, content_type):
+    logging.debug(f"Processing fetch filter for language: {language}, content type: {content_type}")
+    try:
+        # Fetch based on content type
+        if content_type == "movies":
+            titles = list(movies_collection.find({"language": language.lower()}))
+        elif content_type == "tv shows":
+            titles = list(tv_shows_collection.find({"language": language.lower()}))
+        else:
+            bot.send_message(message.chat.id, "Unknown content type selected. Please try again.")
+            return
+
+        logging.debug(f"Fetched titles: {titles}")  # Log fetched titles for debugging
+
+        if not titles:
+            bot.send_message(message.chat.id, f"No {content_type} found in the selected language.")
+            fetch_handler(message)  # Restart fetch workflow
+            return
+
+        # Prepare options for user
+        options = [title["title"] for title in titles] + ["Back"]
+        keyboard = create_keyboard(options)
+        bot.send_message(message.chat.id, f"Select a {content_type[:-1]}:", reply_markup=keyboard)
+        bot.register_next_step_handler(message, process_fetch_selection, titles)
+    except Exception as e:
+        logging.error(f"Error during fetching titles: {e}")
+        bot.send_message(message.chat.id, "An error occurred while fetching titles. Please try again.")
+
+
+
 
 def process_fetch_selection(message, titles):
     logging.debug(f"Fetch title selection: {message.text}")
@@ -396,17 +421,34 @@ def process_fetch_selection(message, titles):
         send_movie_details(message, match)
     elif match.get("type") == "tv show":
         navigate_tv_show_for_fetch(message, match)
+    else:
+        bot.send_message(message.chat.id, "Unknown type. Please try again.")
+        fetch_handler(message)
+
 
 def send_movie_details(message, movie):
     details = movie.get("details", {})
-    response = f"Title: {details.get('name', 'N/A')}\nOverview: {details.get('overview', 'N/A')}\nRelease Date: {details.get('release_date', 'N/A')}"
+    response = (
+        f"Title: {details.get('name', 'N/A')}\n"
+        f"Overview: {details.get('overview', 'N/A')}\n"
+        f"Release Date: {details.get('release_date', 'N/A')}"
+    )
     bot.send_message(message.chat.id, response)
+
     file_id = movie.get("file_id")
     if file_id:
         bot.send_message(message.chat.id, "Here is the movie file:")
         bot.send_document(message.chat.id, file_id)
     else:
         bot.send_message(message.chat.id, "No file has been uploaded for this movie yet.")
+
+    # Redisplay the movie menu
+    titles = list(movies_collection.find({"language": movie["language"]}))
+    options = [title["title"] for title in titles] + ["Back"]
+    keyboard = create_keyboard(options)
+    bot.send_message(message.chat.id, "Select another movie or press 'Back':", reply_markup=keyboard)
+    bot.register_next_step_handler(message, process_fetch_selection, titles)
+
 
 def navigate_tv_show_for_fetch(message, tv_show):
     seasons = tv_show.get("details", {}).get("seasons", [])
@@ -434,29 +476,46 @@ def process_season_selection_for_fetch(message, tv_show):
         bot.send_message(message.chat.id, "Invalid season. Try again.")
         navigate_tv_show_for_fetch(message, tv_show)
         return
+
+    # Add `tv_show` to the season dictionary
+    season["tv_show"] = tv_show
+
+    # Display episode selection menu
     episodes = season.get("episodes", [])
     options = [f"Episode {ep['episode_number']}" for ep in episodes if ep.get("file_id")] + ["Back"]
     keyboard = create_keyboard(options)
-    bot.send_message(message.chat.id, "Select an episode:", reply_markup=keyboard)
+    bot.send_message(message.chat.id, "Select an episode or press 'Back':", reply_markup=keyboard)
     bot.register_next_step_handler(message, process_episode_fetch, season)
+
+
 
 def process_episode_fetch(message, season):
     logging.debug(f"Episode selection for fetch: {message.text}")
-    if handle_back(message, process_season_selection_for_fetch, season):
+    if handle_back(message, process_season_selection_for_fetch, season["tv_show"]):
         return
     try:
         episode_number = int(message.text.replace("Episode ", "").strip())
         episode = next((ep for ep in season["episodes"] if ep["episode_number"] == episode_number), None)
     except ValueError:
         bot.send_message(message.chat.id, "Invalid episode format. Try again.")
-        process_season_selection_for_fetch(message, season)
+        process_season_selection_for_fetch(message, season["tv_show"])
         return
     if not episode or not episode.get("file_id"):
         bot.send_message(message.chat.id, "Invalid episode or not uploaded. Try again.")
-        process_season_selection_for_fetch(message, season)
+        process_season_selection_for_fetch(message, season["tv_show"])
         return
+
+    # Fetch the episode file
     bot.send_message(message.chat.id, f"Fetching episode {episode_number}.")
     bot.send_document(message.chat.id, episode["file_id"])
+
+    # Redisplay the same menu
+    options = [f"Episode {ep['episode_number']}" for ep in season["episodes"] if ep.get("file_id")] + ["Back"]
+    keyboard = create_keyboard(options)
+    bot.send_message(message.chat.id, "Select another episode or press 'Back':", reply_markup=keyboard)
+    bot.register_next_step_handler(message, process_episode_fetch, season)
+
+
 
 # Start Polling
 if __name__ == "__main__":
