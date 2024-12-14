@@ -31,6 +31,7 @@ except errors.ConnectionError as e:
     logging.critical(f"Failed to connect to MongoDB: {e}")
     raise
 
+
 # Utility Functions
 def create_keyboard(options):
     keyboard = ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
@@ -38,10 +39,12 @@ def create_keyboard(options):
         keyboard.add(KeyboardButton(option))
     return keyboard
 
+
 def create_keyboard_with_back(options):
     keyboard = create_keyboard(options)
     keyboard.add(KeyboardButton("Back"))
     return keyboard
+
 
 def handle_back(message, callback_function, *args):
     if message.text.lower() == "back":
@@ -50,8 +53,10 @@ def handle_back(message, callback_function, *args):
         return True
     return False
 
+
 def validate_input(expected_values, user_input):
     return user_input.lower() in [value.lower() for value in expected_values]
+
 
 def search_tmdb(title, item_type):
     try:
@@ -67,6 +72,7 @@ def search_tmdb(title, item_type):
         logging.error(f"TMDB API request failed: {e}")
         return []
 
+
 def get_tmdb_details(item_id, item_type):
     try:
         logging.debug(f"Fetching TMDB details for ID: {item_id}, type: {item_type}")
@@ -81,6 +87,7 @@ def get_tmdb_details(item_id, item_type):
         logging.error(f"TMDB details request failed: {e}")
         return {}
 
+
 # Main Menu
 @bot.message_handler(commands=['start'])
 def start_handler(message):
@@ -88,6 +95,7 @@ def start_handler(message):
     options = ["Add New Title", "Upload", "Fetch Movie/Episode"]
     keyboard = create_keyboard(options)
     bot.send_message(message.chat.id, "Welcome to SparrowFlix! Choose an option:", reply_markup=keyboard)
+
 
 # Add New Title Workflow
 @bot.message_handler(func=lambda message: message.text.lower() == "add new title")
@@ -97,6 +105,7 @@ def add_new_title_handler(message):
     keyboard = create_keyboard_with_back(languages)
     bot.send_message(message.chat.id, "Choose a language for the title:", reply_markup=keyboard)
     bot.register_next_step_handler(message, process_language_selection_for_add)
+
 
 def process_language_selection_for_add(message):
     logging.debug(f"Language selection: {message.text}")
@@ -112,6 +121,7 @@ def process_language_selection_for_add(message):
     bot.send_message(message.chat.id, "Is it a Movie or TV Show?", reply_markup=keyboard)
     bot.register_next_step_handler(message, process_type_selection_for_add, language)
 
+
 def process_type_selection_for_add(message, language):
     logging.debug(f"Type selection: {message.text}, Language: {language}")
     if handle_back(message, process_language_selection_for_add, language):
@@ -123,6 +133,7 @@ def process_type_selection_for_add(message, language):
         return
     msg = bot.send_message(message.chat.id, "Enter the title:")
     bot.register_next_step_handler(msg, process_title_entry, language, item_type)
+
 
 def process_title_entry(message, language, item_type):
     logging.debug(f"Title entry: {message.text}, Language: {language}, Type: {item_type}")
@@ -138,6 +149,7 @@ def process_title_entry(message, language, item_type):
     keyboard = create_keyboard(options)
     bot.send_message(message.chat.id, "Select the closest match:", reply_markup=keyboard)
     bot.register_next_step_handler(message, process_tmdb_selection, language, item_type, results)
+
 
 def process_tmdb_selection(message, language, item_type, results):
     logging.debug(f"TMDB selection: {message.text}, Language: {language}, Type: {item_type}")
@@ -170,6 +182,7 @@ def process_tmdb_selection(message, language, item_type, results):
         bot.send_message(message.chat.id, "An error occurred while saving.")
     start_handler(message)
 
+
 # Upload Workflow
 @bot.message_handler(func=lambda message: message.text.lower() == "upload")
 def upload_handler(message):
@@ -178,6 +191,7 @@ def upload_handler(message):
     keyboard = create_keyboard_with_back(languages)
     bot.send_message(message.chat.id, "Choose a language for the upload:", reply_markup=keyboard)
     bot.register_next_step_handler(message, process_language_selection_for_upload)
+
 
 def process_language_selection_for_upload(message):
     logging.debug(f"Language selection for upload: {message.text}")
@@ -193,6 +207,7 @@ def process_language_selection_for_upload(message):
     bot.send_message(message.chat.id, "Is it a Movie or TV Show?", reply_markup=keyboard)
     bot.register_next_step_handler(message, process_type_selection_for_upload, language)
 
+
 def process_type_selection_for_upload(message, language):
     logging.debug(f"Type selection for upload: {message.text}, Language: {language}")
     if handle_back(message, process_language_selection_for_upload, language):
@@ -204,6 +219,7 @@ def process_type_selection_for_upload(message, language):
         return
     msg = bot.send_message(message.chat.id, f"Search for the {item_type} by name:")
     bot.register_next_step_handler(msg, process_upload_search, language, item_type)
+
 
 def process_upload_search(message, language, item_type):
     logging.debug(f"Search query for upload: {message.text}, Type: {item_type}, Language: {language}")
@@ -225,6 +241,7 @@ def process_upload_search(message, language, item_type):
     keyboard = create_keyboard(options)
     bot.send_message(message.chat.id, "Select a match or type 'Back':", reply_markup=keyboard)
     bot.register_next_step_handler(message, process_upload_selection, language, item_type, results)
+
 
 def process_upload_selection(message, language, item_type, results):
     logging.debug(f"Selection for upload: {message.text}, Type: {item_type}, Language: {language}")
@@ -275,10 +292,13 @@ def process_file_upload(message, item):
     except Exception as e:
         logging.error(f"Error during file upload update: {e}")
         bot.send_message(message.chat.id, "An error occurred while uploading.")
+
+
 def handle_movie_upload(message, movie):
     logging.debug(f"Preparing movie upload for: {movie['title']}")
     bot.send_message(message.chat.id, f"Uploading for the movie: {movie['title']}. Please upload the file.")
     bot.register_next_step_handler(message, process_file_upload, movie)
+
 
 def navigate_tv_show(message, tv_show):
     seasons = tv_show.get("details", {}).get("seasons", [])
@@ -290,6 +310,7 @@ def navigate_tv_show(message, tv_show):
     keyboard = create_keyboard(options)
     bot.send_message(message.chat.id, "Select a season:", reply_markup=keyboard)
     bot.register_next_step_handler(message, process_season_selection_for_upload, tv_show)
+
 
 def process_season_selection_for_upload(message, tv_show):
     logging.debug(f"Season selection for upload: {message.text}, TV Show: {tv_show['title']}")
@@ -308,6 +329,7 @@ def process_season_selection_for_upload(message, tv_show):
         return
     bot.send_message(message.chat.id, f"Uploading for Season {season_number}. Please upload episode 1.")
     bot.register_next_step_handler(message, process_episode_upload, tv_show, season_number, 1)
+
 
 def process_episode_upload(message, tv_show, season_number, episode_number):
     logging.debug(f"File upload handler triggered for Season {season_number}, Episode {episode_number} of TV Show: {tv_show['title']}")
@@ -336,6 +358,7 @@ def process_episode_upload(message, tv_show, season_number, episode_number):
     except Exception as e:
         logging.error(f"Error during file upload update: {e}")
         bot.send_message(message.chat.id, "An error occurred while uploading.")
+
 
 # Fetch Workflow
 @bot.message_handler(func=lambda message: message.text.lower() == "fetch movie/episode")
@@ -405,8 +428,6 @@ def process_fetch_filter_method(message, language, content_type):
         bot.send_message(message.chat.id, "An error occurred while fetching titles. Please try again.")
 
 
-
-
 def process_fetch_selection(message, titles):
     logging.debug(f"Fetch title selection: {message.text}")
     if handle_back(message, fetch_handler):
@@ -461,6 +482,7 @@ def navigate_tv_show_for_fetch(message, tv_show):
     bot.send_message(message.chat.id, "Select a season:", reply_markup=keyboard)
     bot.register_next_step_handler(message, process_season_selection_for_fetch, tv_show)
 
+
 def process_season_selection_for_fetch(message, tv_show):
     logging.debug(f"Season selection for fetch: {message.text}")
     if handle_back(message, navigate_tv_show_for_fetch, tv_show):
@@ -486,7 +508,6 @@ def process_season_selection_for_fetch(message, tv_show):
     keyboard = create_keyboard(options)
     bot.send_message(message.chat.id, "Select an episode or press 'Back':", reply_markup=keyboard)
     bot.register_next_step_handler(message, process_episode_fetch, season)
-
 
 
 def process_episode_fetch(message, season):
