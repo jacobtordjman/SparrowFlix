@@ -128,54 +128,61 @@ def register_fetch_handlers(bot):
         bot.send_message(message.chat.id, "Select a season:", reply_markup=keyboard)
         bot.register_next_step_handler(message, process_season_selection_for_fetch, tv_show)
 
-    def process_season_selection_for_fetch(message, tv_show):
-        logging.debug(f"Season selection for fetch: {message.text}")
-        if handle_back(message, navigate_tv_show_for_fetch, tv_show):
+    def process_season_selection_for_fetch(message, bot, tv_show, back_callback):
+        """
+        Handles the selection of a season for a TV show.
+        """
+        if handle_back(message, navigate_tv_show_for_fetch, bot, tv_show, back_callback):
             return
+
         try:
+            # Validate the selected season number
             season_number = int(message.text.replace("Season ", "").strip())
             season = next((s for s in tv_show["details"]["seasons"] if s["season_number"] == season_number), None)
-        except ValueError:
-            bot.send_message(message.chat.id, "Invalid season format. Try again.")
-            navigate_tv_show_for_fetch(message, tv_show)
+        except (ValueError, StopIteration):
+            bot.send_message(message.chat.id, "Invalid season selection. Please try again.")
+            navigate_tv_show_for_fetch(bot, message, tv_show, back_callback)
             return
+
         if not season:
-            bot.send_message(message.chat.id, "Invalid season. Try again.")
-            navigate_tv_show_for_fetch(message, tv_show)
+            bot.send_message(message.chat.id, "Invalid season. Please try again.")
+            navigate_tv_show_for_fetch(bot, message, tv_show, back_callback)
             return
 
-        # Add `tv_show` to the season dictionary
-        season["tv_show"] = tv_show
-
-        # Display episode selection menu
-        episodes = season.get("episodes", [])
-        options = [f"Episode {ep['episode_number']}" for ep in episodes if ep.get("file_id")] + ["Back"]
+        options = [f"Episode {ep['episode_number']}" for ep in season.get("episodes", []) if ep.get("file_id")] + [
+            "Back"]
         keyboard = create_keyboard(options)
         bot.send_message(message.chat.id, "Select an episode or press 'Back':", reply_markup=keyboard)
-        bot.register_next_step_handler(message, process_episode_fetch, season)
 
-    def process_episode_fetch(message, season):
-        logging.debug(f"Episode selection for fetch: {message.text}")
-        if handle_back(message, process_season_selection_for_fetch, season["tv_show"]):
+        bot.register_next_step_handler(message, process_episode_fetch, bot, season, back_callback)
+
+    def process_episode_fetch(message, bot, season, back_callback):
+        """
+        Handles fetching a specific episode.
+        """
+        if handle_back(message, process_season_selection_for_fetch, bot, season["tv_show"], back_callback):
             return
+
         try:
+            # Validate episode selection
             episode_number = int(message.text.replace("Episode ", "").strip())
             episode = next((ep for ep in season["episodes"] if ep["episode_number"] == episode_number), None)
-        except ValueError:
-            bot.send_message(message.chat.id, "Invalid episode format. Try again.")
-            process_season_selection_for_fetch(message, season["tv_show"])
+        except (ValueError, StopIteration):
+            bot.send_message(message.chat.id, "Invalid episode selection. Please try again.")
+            process_season_selection_for_fetch(message, bot, season["tv_show"], back_callback)
             return
+
         if not episode or not episode.get("file_id"):
             bot.send_message(message.chat.id, "Invalid episode or not uploaded. Try again.")
-            process_season_selection_for_fetch(message, season["tv_show"])
+            process_season_selection_for_fetch(message, bot, season["tv_show"], back_callback)
             return
 
-        # Fetch the episode file
-        bot.send_message(message.chat.id, f"Fetching episode {episode_number}.")
+        # Send the episode file
         bot.send_document(message.chat.id, episode["file_id"])
+        bot.send_message(message.chat.id, "Select another episode or press 'Back':")
 
-        # Redisplay the same menu
+        # Redisplay episode selection menu
         options = [f"Episode {ep['episode_number']}" for ep in season["episodes"] if ep.get("file_id")] + ["Back"]
         keyboard = create_keyboard(options)
-        bot.send_message(message.chat.id, "Select another episode or press 'Back':", reply_markup=keyboard)
-        bot.register_next_step_handler(message, process_episode_fetch, season)
+        bot.register_next_step_handler(message, process_episode_fetch, bot, season, back_callback)
+
