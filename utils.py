@@ -1,8 +1,11 @@
 import logging
 import requests
+from dotenv import load_dotenv
 from telebot.types import ReplyKeyboardMarkup, KeyboardButton
 import os
 
+# Load environment variables
+load_dotenv()
 # TMDB API Base URL and API Key
 TMDB_BASE_URL = "https://api.themoviedb.org/3"
 TMDB_API_KEY = os.getenv("TMDB_API_KEY")

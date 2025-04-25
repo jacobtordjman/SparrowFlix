@@ -11,6 +11,22 @@ from utils import (
     get_tmdb_details
 )
 
+# Middleware to check for global commands (/stop and /start)
+def check_global_commands(bot, message, next_step, *args):
+    """
+    Middleware to check for global commands before proceeding to the next handler step.
+    """
+    if message.text == "/stop":
+        bot.send_message(message.chat.id, "Bot is stopping. Goodbye!")
+        logging.info(f"Bot stopped by user: {message.chat.id}")
+        import os
+        os._exit(0)
+    elif message.text == "/start":
+        from bot import start_command  # Import start_command for reuse
+        start_command(message)
+    else:
+        next_step(message, *args)
+
 # Function to register handlers
 def register_add_title_handlers(bot):
     """
@@ -26,7 +42,7 @@ def register_add_title_handlers(bot):
         languages = ["English", "Hebrew", "Japanese"]
         keyboard = create_keyboard_with_back(languages)
         bot.send_message(message.chat.id, "Choose a language for the title:", reply_markup=keyboard)
-        bot.register_next_step_handler(message, process_language_selection_for_add)
+        bot.register_next_step_handler(message, lambda msg: check_global_commands(bot, msg, process_language_selection_for_add))
 
     def process_language_selection_for_add(message):
         """
@@ -43,7 +59,9 @@ def register_add_title_handlers(bot):
         options = ["Movie", "TV Show"]
         keyboard = create_keyboard_with_back(options)
         bot.send_message(message.chat.id, "Is it a Movie or TV Show?", reply_markup=keyboard)
-        bot.register_next_step_handler(message, process_type_selection_for_add, language)
+        bot.register_next_step_handler(
+            message, lambda msg: check_global_commands(bot, msg, process_type_selection_for_add, language)
+        )
 
     def process_type_selection_for_add(message, language):
         """
@@ -58,7 +76,9 @@ def register_add_title_handlers(bot):
             process_language_selection_for_add(message)
             return
         msg = bot.send_message(message.chat.id, "Enter the title:")
-        bot.register_next_step_handler(msg, process_title_entry, language, item_type)
+        bot.register_next_step_handler(
+            msg, lambda msg: check_global_commands(bot, msg, process_title_entry, language, item_type)
+        )
 
     def process_title_entry(message, language, item_type):
         """
@@ -71,7 +91,9 @@ def register_add_title_handlers(bot):
         results = search_tmdb(title, item_type)
         if not results:
             bot.send_message(message.chat.id, f"No matches found for '{title}'. Try again or type 'Back'.")
-            bot.register_next_step_handler(message, process_title_entry, language, item_type)
+            bot.register_next_step_handler(
+                message, lambda msg: check_global_commands(bot, msg, process_title_entry, language, item_type)
+            )
             return
         options = [
             result.get('name', result.get('title'))
@@ -80,7 +102,9 @@ def register_add_title_handlers(bot):
         ] + ["Back"]
         keyboard = create_keyboard(options)
         bot.send_message(message.chat.id, "Select the closest match:", reply_markup=keyboard)
-        bot.register_next_step_handler(message, process_tmdb_selection, language, item_type, results)
+        bot.register_next_step_handler(
+            message, lambda msg: check_global_commands(bot, msg, process_tmdb_selection, language, item_type, results)
+        )
 
     def process_tmdb_selection(message, language, item_type, results):
         """
@@ -114,4 +138,5 @@ def register_add_title_handlers(bot):
         except Exception as e:
             if isinstance(e, Exception) and hasattr(e, 'details') and 'key' in e.details:
                 bot.send_message(message.chat.id, "This title already exists in the database.")
-                return message
+            else:
+                bot.send_message(message.chat.id, "An error occurred while saving the title. Try again later.")

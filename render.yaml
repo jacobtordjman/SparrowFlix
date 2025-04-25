@@ -1,6 +1,24 @@
 services:
-  - name: telegram-bot
-    type: worker  # Indicates this is a long-running background process
+  - name: my-bot
+    type: worker  # Specifies that this is a background worker, not a web service
+    runtime: python
+    plan: free    # Uses the free plan
     buildCommand: "pip install -r requirements.txt"  # Command to install dependencies
-    startCommand: "./start.sh"  # Command to start your bot
-    runtime: python  # Specifies the Python runtime
+    startCommand: "python bot.py"  # Command to start your bot
+    envVars:
+      - key: BOT_TOKEN
+        value: "6533479070:AAE7Z2iBtdy8O54rqhoZc3H3Df-OkPdeG7U"
+      - key: MONGO_URI
+        value: "mongodb+srv://jturjema:JDlYztgARrLfvdz6@cluster0.lnsqx.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
+      - key: TMDB_API_KEY
+        value: "82c4ac021cffd8e3693622ed848f33eb"
+      - key: ENV
+        value: "local"  # You can switch to "production" if deploying to production
+      - key: LOCAL_WEBHOOK_URL
+        value: "https://bba5-84-94-216-126.ngrok-free.app/webhook"
+      - key: LOCAL_PORT
+        value: "5000"
+      - key: PROD_WEBHOOK_URL
+        value: "https://sparrowflix.onrender.com/webhook"
+      - key: PROD_PORT
+        value: "10000"

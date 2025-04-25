@@ -1,6 +1,10 @@
 # Imports
+import os
+from dotenv import load_dotenv
+import tempfile
 import logging
 import re
+import time
 from telebot import TeleBot
 from database import movies_collection, tv_shows_collection
 from utils import (
@@ -9,6 +13,10 @@ from utils import (
     handle_back,
     validate_input
 )
+
+load_dotenv()
+STORAGE_CHANNEL_ID = int(os.getenv("STORAGE_CHANNEL_ID"))
+
 
 def register_upload_handlers(bot):
     @bot.message_handler(func=lambda message: message.text.lower() == "upload")
@@ -72,7 +80,6 @@ def register_upload_handlers(bot):
         bot.send_message(message.chat.id, "Select a match or type 'Back':", reply_markup=keyboard)
         bot.register_next_step_handler(message, process_upload_selection, language, item_type, results)
 
-
     def process_upload_selection(message, language, item_type, results):
         logging.debug(f"Selection for upload: {message.text}, Type: {item_type}, Language: {language}")
         if handle_back(message, process_upload_search, language, item_type):
@@ -86,48 +93,140 @@ def register_upload_handlers(bot):
         if item_type == "movie":
             handle_movie_upload(message, match)
         elif item_type == "tv show":
-            navigate_tv_show(message, match)
+            navigate_tv_show(bot, message, match, process_upload_search)  # Pass required arguments
 
-
-    def process_file_upload(message, item):
-        logging.debug(f"File upload handler triggered for item: {item}")
-        file_id = None
-        if message.document:
-            file_id = message.document.file_id
-            logging.debug(f"Document file ID received: {file_id}")
-        elif message.video:
-            file_id = message.video.file_id
-            logging.debug(f"Video file ID received: {file_id}")
-
-        if not file_id:
-            logging.warning(f"Invalid file upload attempt: {message}")
-            bot.send_message(message.chat.id, "Invalid file. Please try again.")
+    def process_file_upload_batch(message, tv_show=None, item_type=None, season=None):
+        """
+        Processes uploaded files for a TV show or movie, relying on captions for filenames.
+        """
+        chat_id = message.chat.id
+        logging.debug(
+            f"Processing file upload: chat_id={chat_id}, tv_show={tv_show}, item_type={item_type}, season={season}")
+        if message.content_type not in ['document', 'video']:
+            bot.send_message(chat_id, "Please upload a valid file (video or document).")
             return
-
+        file = message.document if message.content_type == 'document' else message.video
+        file_id = file.file_id
+        caption = message.caption  # Extract caption provided during file upload
+        if not caption:
+            bot.send_message(chat_id, "Filename missing. Please upload the file again with a caption (e.g., '1.mp4').")
+            return
+        file_name = caption.strip()
+        logging.debug(f"File ID: {file_id}, Filename from caption: {file_name}")
+        # Extract episode number from caption
+        match = re.match(r"(\d+)", file_name)
+        if not match:
+            bot.send_message(chat_id, f"Caption '{file_name}' does not follow the expected format. Skipping.")
+            return
+        episode_number = int(match.group(1))
+        logging.debug(f"Processing file: {file_name}, Episode: {episode_number}, File ID: {file_id}")
+        # Prepare a descriptive caption for the channel
+        if item_type == "tv show" and season:
+            channel_caption = f"TV: {tv_show['title']} - S{season['season_number']}E{episode_number} ({tv_show.get('language', 'Unknown')})"
+        elif item_type == "movie":
+            channel_caption = f"Movie: {tv_show['title']} ({tv_show.get('language', 'Unknown')})"
+        else:
+            channel_caption = file_name
         try:
-            if "tv_show_id" in item:  # For TV shows
-                result = tv_shows_collection.update_one(
-                    {"_id": item["tv_show_id"], "details.seasons.season_number": item["season_number"]},
-                    {"$push": {"details.seasons.$.episodes": {"episode_number": item["episode_number"], "file_id": file_id}}}
-                )
-                logging.debug(f"Update result for TV show: {result.modified_count} document(s) updated.")
-                bot.send_message(message.chat.id, f"Episode {item['episode_number']} uploaded successfully.")
-            else:  # For movies
-                result = movies_collection.update_one(
-                    {"_id": item["_id"]},
-                    {"$set": {"file_id": file_id}}
-                )
-                logging.debug(f"Update result for movie: {result.modified_count} document(s) updated.")
-                bot.send_message(message.chat.id, f"Movie uploaded successfully.")
-        except Exception as e:
-            logging.error(f"Error during file upload update: {e}")
-            bot.send_message(message.chat.id, "An error occurred while uploading.")
+            # Forward the file to the storage channel
+            if message.content_type == 'document':
+                forwarded = bot.send_document(STORAGE_CHANNEL_ID, file_id, caption=channel_caption)
+            else:  # video
+                forwarded = bot.send_video(STORAGE_CHANNEL_ID, file_id, caption=channel_caption)
 
+            # Generate a permanent message link
+            # For a private channel, we need to use the numeric ID format
+            channel_id_str = str(STORAGE_CHANNEL_ID).replace('-100', '')
+            message_link = f"https://t.me/c/{channel_id_str}/{forwarded.message_id}"
+
+            logging.debug(f"File forwarded to channel. Message link: {message_link}")
+
+            # Store both file_id and message_link in database
+            if item_type == "tv show" and season:
+                result = tv_shows_collection.update_one(
+                    {"_id": tv_show["_id"], "details.seasons.season_number": season["season_number"]},
+                    {"$push": {"details.seasons.$.episodes": {
+                        "episode_number": episode_number,
+                        "file_id": file_id,
+                        "message_link": message_link
+                    }}}
+                )
+                bot.send_message(chat_id, f"Episode {episode_number} ({file_name}) uploaded successfully.")
+            elif item_type == "movie":
+                result = movies_collection.update_one(
+                    {"_id": tv_show["_id"]},
+                    {"$set": {
+                        "file_id": file_id,
+                        "message_link": message_link
+                    }}
+                )
+                bot.send_message(chat_id, f"Movie file ({file_name}) uploaded successfully.")
+
+        except Exception as e:
+            logging.error(f"Error in file upload process: {e}")
+            bot.send_message(chat_id, "An error occurred while processing your upload. Please try again.")
+
+    # Temporary dictionary to store media group messages
+    media_groups = {}
+
+    @bot.message_handler(content_types=['video', 'document'], func=lambda message: message.media_group_id is not None)
+    def handle_media_group(message):
+        """
+        Handles incoming media group files (batch uploads).
+        """
+        media_group_id = message.media_group_id
+        chat_id = message.chat.id
+
+        # Log the received message
+        logging.debug(f"Received message type: {type(message)}, media_group_id: {media_group_id}")
+
+        # Collect messages belonging to the same media group
+        if media_group_id not in media_groups:
+            media_groups[media_group_id] = []
+            logging.debug(f"New media group started: {media_group_id}")
+
+        media_groups[media_group_id].append(message)
+        logging.debug(f"File added to media group {media_group_id}: {message}")
+
+        # If we already collected multiple files, process them
+        if len(media_groups[media_group_id]) > 1:
+            logging.debug(f"Processing media group {media_group_id}")
+            process_file_upload_batch(media_groups[media_group_id], chat_id)
+            del media_groups[media_group_id]  # Cleanup
+
+    def process_files(messages, chat_id):
+        """
+        Processes the collected files from a media group.
+        """
+        for msg in messages:
+            if msg.content_type == 'document':
+                file = msg.document
+            elif msg.content_type == 'video':
+                file = msg.video
+            else:
+                continue
+
+            file_id = file.file_id
+            file_name = getattr(file, "file_name", "unknown_file")
+            logging.debug(f"Processing file: {file_name}, ID: {file_id}")
+
+            # Extract episode number (assumes filename starts with a number)
+            match = re.match(r"(\d+)", file_name)
+            if not match:
+                bot.send_message(chat_id, f"File {file_name} does not follow the expected format. Skipping.")
+                continue
+
+            episode_number = int(match.group(1))
+            logging.debug(f"Extracted episode number: {episode_number}")
+
+            # Simulate processing/upload logic (replace with your DB logic)
+            bot.send_message(chat_id, f"Episode {episode_number} ({file_name}) uploaded successfully.")
 
     def handle_movie_upload(message, movie):
         logging.debug(f"Preparing movie upload for: {movie['title']}")
-        bot.send_message(message.chat.id, f"Uploading for the movie: {movie['title']}. Please upload the file.")
-        bot.register_next_step_handler(message, process_file_upload, movie)
+        bot.send_message(message.chat.id,
+                         f"Uploading files for the movie: {movie['title']}. Please upload the file(s).")
+        bot.register_next_step_handler(message, process_file_upload_batch, movie, "movie")
 
     def navigate_tv_show(bot, message, tv_show, back_callback):
         """
@@ -155,13 +254,7 @@ def register_upload_handlers(bot):
 
     def process_season_selection_for_upload(message, bot, tv_show, back_callback):
         """
-        Processes the user's season selection for a TV show.
-
-        Args:
-            message: The message object from the user.
-            bot: The bot instance.
-            tv_show: The selected TV show dictionary with details.
-            back_callback: The function to call when the user selects 'Back'.
+        Handles the user's selection of a season and initiates batch uploads.
         """
         if handle_back(message, navigate_tv_show, bot, tv_show, back_callback):
             return
@@ -180,8 +273,12 @@ def register_upload_handlers(bot):
             navigate_tv_show(bot, message, tv_show, back_callback)
             return
 
-        bot.send_message(message.chat.id, f"You selected Season {season_number}. Proceeding with the next step.")
-        # Next steps for the selected season can be added here.
+        # Prompt for batch upload
+        bot.send_message(
+            message.chat.id,
+            f"Uploading files for Season {season_number}. Please upload all episodes (e.g., 1.mp4, 2.avi)."
+        )
+        bot.register_next_step_handler(message, process_file_upload_batch, tv_show, "tv show", season)
 
     def process_episode_upload(message, tv_show, season_number, episode_number):
         logging.debug(f"File upload handler triggered for Season {season_number}, Episode {episode_number} of TV Show: {tv_show['title']}")
