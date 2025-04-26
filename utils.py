@@ -1,4 +1,6 @@
 import logging
+import sys
+
 import requests
 from dotenv import load_dotenv
 from telebot.types import ReplyKeyboardMarkup, KeyboardButton
@@ -9,6 +11,8 @@ load_dotenv()
 # TMDB API Base URL and API Key
 TMDB_BASE_URL = "https://api.themoviedb.org/3"
 TMDB_API_KEY = os.getenv("TMDB_API_KEY")
+# Add at the top with other imports
+STORAGE_CHANNEL_ID = int(os.getenv("STORAGE_CHANNEL_ID"))
 
 if not TMDB_API_KEY:
     raise ValueError("TMDB_API_KEY is missing or invalid.")
@@ -22,7 +26,21 @@ def create_keyboard(options):
     for option in options:
         keyboard.add(KeyboardButton(option))
     return keyboard
-
+def check_global_commands(bot, message):
+    """
+    Universal handler for global commands that should work everywhere.
+    Returns True if a global command was processed and further handling should be stopped.
+    """
+    if message.text == "/stop":
+        bot.send_message(message.chat.id, "Bot is stopping. Goodbye!")
+        logging.info(f"Bot stopped by user: {message.chat.id}")
+        sys.exit(0)  # Force immediate exit
+        return True
+    elif message.text == "/start":
+        from global_handlers import start_handler
+        start_handler(message)
+        return True
+    return False
 def create_keyboard_with_back(options):
     """
     Creates a Telegram reply keyboard with given options and adds a 'Back' button.

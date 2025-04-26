@@ -1,30 +1,34 @@
 import os
 import sys
 import threading
-
 import telebot
 import logging
-from flask import Flask, request
+from flask import Flask, request, send_from_directory
 from dotenv import load_dotenv
 from add_title import register_add_title_handlers
 from upload import register_upload_handlers
 from fetch import register_fetch_handlers
 from global_handlers import register_global_handlers
-
+from miniapp import register_miniapp_handlers
+from webapp.api import api_blueprint  # Import the blueprint from the correct location
 # Load environment variables
 load_dotenv()
-
 # Environment variables
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 ENV = os.getenv("ENV", "local")
 WEBHOOK_URL = os.getenv("WEBHOOK_URL") if ENV == "production" else os.getenv("LOCAL_WEBHOOK_URL")
 PORT = int(os.getenv("PORT", 5000))
-
 # Flask app
-app = Flask(__name__)
-
+app = Flask(__name__, static_folder='webapp')
 # Initialize bot
 bot = telebot.TeleBot(BOT_TOKEN, parse_mode="HTML")
+# Register the API blueprint
+app.register_blueprint(api_blueprint, url_prefix='/api')
+# Add a route to serve the Mini App
+@app.route('/app')
+def serve_app():
+    return send_from_directory('webapp', 'index.html')
+
 
 # Logging Configuration
 logging.basicConfig(
@@ -34,16 +38,6 @@ logging.basicConfig(
 
 # Suppress MongoDB heartbeat and connection logs
 logging.getLogger("pymongo").setLevel(logging.WARNING)
-
-
-# === MAIN MENU HANDLER === #
-@bot.message_handler(commands=['start'])
-def handle_start(message):
-    """
-    Start command: Display main menu with options.
-    """
-    chat_id = message.chat.id
-    bot.send_message(chat_id, "Welcome to SparrowFlix! 🎬\nChoose an option:", reply_markup=main_menu())
 
 
 def main_menu():
@@ -57,26 +51,6 @@ def main_menu():
     return markup
 
 
-@bot.message_handler(commands=['stop'])
-def handle_stop(message):
-    """
-    Stop command: Stop the bot and exit the program.
-    """
-    chat_id = message.chat.id
-    bot.send_message(chat_id, "Bot is shutting down... Goodbye! 👋")
-    logging.info("Received /stop command. Shutting down the bot.")
-
-    # Stop the bot gracefully
-    def shutdown():
-        bot.stop_polling()  # Stops the polling loop
-        logging.info("Bot polling stopped.")
-        sys.exit(0)  # Exit the script
-
-    # Run shutdown in a separate thread to allow message sending before exit
-    shutdown_thread = threading.Thread(target=shutdown)
-    shutdown_thread.start()
-
-
 # === REGISTER HANDLERS === #
 def register_handlers():
     """
@@ -86,6 +60,7 @@ def register_handlers():
     register_upload_handlers(bot)
     register_fetch_handlers(bot)
     register_global_handlers(bot)
+    register_miniapp_handlers(bot)
 
 
 # === FLASK ROUTE FOR WEBHOOK === #

@@ -1,5 +1,7 @@
 # Imports
 import logging
+import sys
+
 from telebot import TeleBot
 from database import movies_collection, tv_shows_collection
 from utils import (
@@ -19,11 +21,10 @@ def check_global_commands(bot, message, next_step, *args):
     if message.text == "/stop":
         bot.send_message(message.chat.id, "Bot is stopping. Goodbye!")
         logging.info(f"Bot stopped by user: {message.chat.id}")
-        import os
-        os._exit(0)
+        sys.exit(0)
     elif message.text == "/start":
-        from bot import start_command  # Import start_command for reuse
-        start_command(message)
+        from global_handlers import start_handler
+        start_handler(message)
     else:
         next_step(message, *args)
 

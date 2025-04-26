@@ -1,5 +1,7 @@
 import logging
 import os
+import sys
+
 from utils import create_keyboard
 
 logging.basicConfig(level=logging.DEBUG, format="%(asctime)s - %(levelname)s - %(message)s")
@@ -30,4 +32,4 @@ def register_global_handlers(bot):
 
         bot.send_message(message.chat.id, "Stopping the bot. Goodbye!")
         logging.info(f"Bot stopped by user: {message.from_user.id}")
-        os._exit(0)  # Immediately terminates the script
+        sys.exit(0)  # Immediately terminates the script

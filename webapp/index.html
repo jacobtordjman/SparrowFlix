@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>SparrowFlix</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+</head>
+<body>
+    <div id="app">
+        <header>
+            <div class="logo">SparrowFlix</div>
+            <div class="search-container">
+                <input type="text" id="search-input" placeholder="Search...">
+            </div>
+        </header>
+
+        <nav class="categories">
+            <button class="category-btn active" data-category="all">All</button>
+            <button class="category-btn" data-category="movies">Movies</button>
+            <button class="category-btn" data-category="tvshows">TV Shows</button>
+        </nav>
+
+        <main>
+            <div id="content-grid"></div>
+        </main>
+
+        <div id="player-container" class="hidden">
+            <div class="player-header">
+                <button id="back-btn">Back</button>
+                <h2 id="player-title">Title</h2>
+            </div>
+            <div id="video-player"></div>
+            <div id="episode-selector" class="hidden"></div>
+        </div>
+    </div>
+
+    <script src="api.js"></script>
+    <script src="components/MovieCard.js"></script>
+    <script src="components/Player.js"></script>
+    <script src="components/CategorySelector.js"></script>
+    <script src="components/SearchBar.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>

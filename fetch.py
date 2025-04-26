@@ -1,12 +1,14 @@
 # Imports
 import json
 import logging
+import sys
+
 from database import movies_collection, tv_shows_collection
 from utils import (
     create_keyboard,
     create_keyboard_with_back,
     handle_back,
-    validate_input
+    validate_input, STORAGE_CHANNEL_ID
 )
 
 def register_fetch_handlers(bot):
@@ -119,10 +121,16 @@ def register_fetch_handlers(bot):
         )
         bot.send_message(message.chat.id, response)
 
-        file_id = movie.get("file_id")
-        if file_id:
+        # Check for channel message ID first
+        channel_message_id = movie.get("channel_message_id")
+        if channel_message_id:
+            bot.send_message(message.chat.id, "Here is the movie from our channel:")
+            # Forward the message from the channel
+            bot.forward_message(message.chat.id, STORAGE_CHANNEL_ID, channel_message_id)
+        # Fall back to file_id if channel_message_id is not available
+        elif movie.get("file_id"):
             bot.send_message(message.chat.id, "Here is the movie file:")
-            bot.send_document(message.chat.id, file_id)
+            bot.send_document(message.chat.id, movie.get("file_id"))
         else:
             bot.send_message(message.chat.id, "No file has been uploaded for this movie yet.")
 
@@ -189,29 +197,39 @@ def register_fetch_handlers(bot):
             process_season_selection_for_fetch(message, season["tv_show"])
             return
 
-        if not episode or not episode.get("file_id"):
+        if not episode:
             bot.send_message(message.chat.id, "Invalid episode or not uploaded. Try again.")
             process_season_selection_for_fetch(message, season["tv_show"])
             return
 
         # Fetch and send the episode file
         bot.send_message(message.chat.id, f"Fetching episode {episode_number}.")
-        bot.send_document(message.chat.id, episode["file_id"])
+
+        # Check for channel message ID first
+        if episode.get("channel_message_id"):
+            # Forward the message from the channel
+            bot.forward_message(message.chat.id, STORAGE_CHANNEL_ID, episode["channel_message_id"])
+        # Fall back to file_id if channel_message_id is not available
+        elif episode.get("file_id"):
+            bot.send_document(message.chat.id, episode["file_id"])
+        else:
+            bot.send_message(message.chat.id, "This episode is not available.")
 
         # Redisplay the episode selection menu
-        options = [f"Episode {ep['episode_number']}" for ep in season["episodes"] if ep.get("file_id")] + ["Back"]
+        options = [f"Episode {ep['episode_number']}" for ep in season["episodes"] if
+                   ep.get("file_id") or ep.get("channel_message_id")] + ["Back"]
         keyboard = create_keyboard(options)
         bot.send_message(message.chat.id, "Select another episode or press 'Back':", reply_markup=keyboard)
         bot.register_next_step_handler(message, process_episode_fetch, season)
-
     def check_global_commands(message):
+        """
+        Checks for global commands during fetch workflow.
+        """
         if message.text.strip().lower() == "/stop":
             bot.send_message(message.chat.id, "Bot stopping. Goodbye!")
-            # replit change
-            import os
-            os._exit(0)
-            # replit change
+            sys.exit(0)
         if message.text.strip().lower() == "/start":
-            bot.send_message(message.chat.id, "Restarting the bot...")
-            return True  # Stop further handlers
+            from global_handlers import start_handler
+            start_handler(message)
+            return True
         return False

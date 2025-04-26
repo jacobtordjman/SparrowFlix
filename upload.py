@@ -81,6 +81,9 @@ def register_upload_handlers(bot):
         bot.register_next_step_handler(message, process_upload_selection, language, item_type, results)
 
     def process_upload_selection(message, language, item_type, results):
+        """
+        Handles the selection of a search result for upload.
+        """
         logging.debug(f"Selection for upload: {message.text}, Type: {item_type}, Language: {language}")
         if handle_back(message, process_upload_search, language, item_type):
             return
@@ -93,7 +96,7 @@ def register_upload_handlers(bot):
         if item_type == "movie":
             handle_movie_upload(message, match)
         elif item_type == "tv show":
-            navigate_tv_show(bot, message, match, process_upload_search)  # Pass required arguments
+            navigate_tv_show(message, match, process_upload_search)  # Updated call
 
     def process_file_upload_batch(message, tv_show=None, item_type=None, season=None):
         """
@@ -102,69 +105,115 @@ def register_upload_handlers(bot):
         chat_id = message.chat.id
         logging.debug(
             f"Processing file upload: chat_id={chat_id}, tv_show={tv_show}, item_type={item_type}, season={season}")
+
         if message.content_type not in ['document', 'video']:
             bot.send_message(chat_id, "Please upload a valid file (video or document).")
             return
+
         file = message.document if message.content_type == 'document' else message.video
         file_id = file.file_id
         caption = message.caption  # Extract caption provided during file upload
+
         if not caption:
             bot.send_message(chat_id, "Filename missing. Please upload the file again with a caption (e.g., '1.mp4').")
             return
+
         file_name = caption.strip()
         logging.debug(f"File ID: {file_id}, Filename from caption: {file_name}")
-        # Extract episode number from caption
-        match = re.match(r"(\d+)", file_name)
-        if not match:
-            bot.send_message(chat_id, f"Caption '{file_name}' does not follow the expected format. Skipping.")
-            return
-        episode_number = int(match.group(1))
-        logging.debug(f"Processing file: {file_name}, Episode: {episode_number}, File ID: {file_id}")
-        # Prepare a descriptive caption for the channel
-        if item_type == "tv show" and season:
-            channel_caption = f"TV: {tv_show['title']} - S{season['season_number']}E{episode_number} ({tv_show.get('language', 'Unknown')})"
-        elif item_type == "movie":
-            channel_caption = f"Movie: {tv_show['title']} ({tv_show.get('language', 'Unknown')})"
-        else:
-            channel_caption = file_name
-        try:
-            # Forward the file to the storage channel
-            if message.content_type == 'document':
-                forwarded = bot.send_document(STORAGE_CHANNEL_ID, file_id, caption=channel_caption)
-            else:  # video
-                forwarded = bot.send_video(STORAGE_CHANNEL_ID, file_id, caption=channel_caption)
 
-            # Generate a permanent message link
-            # For a private channel, we need to use the numeric ID format
-            channel_id_str = str(STORAGE_CHANNEL_ID).replace('-100', '')
-            message_link = f"https://t.me/c/{channel_id_str}/{forwarded.message_id}"
-
-            logging.debug(f"File forwarded to channel. Message link: {message_link}")
-
-            # Store both file_id and message_link in database
-            if item_type == "tv show" and season:
-                result = tv_shows_collection.update_one(
-                    {"_id": tv_show["_id"], "details.seasons.season_number": season["season_number"]},
-                    {"$push": {"details.seasons.$.episodes": {
-                        "episode_number": episode_number,
-                        "file_id": file_id,
-                        "message_link": message_link
-                    }}}
-                )
-                bot.send_message(chat_id, f"Episode {episode_number} ({file_name}) uploaded successfully.")
-            elif item_type == "movie":
+        # For movies, we don't need to extract an episode number
+        if item_type == "movie":
+            try:
+                # Update movie document with file_id
                 result = movies_collection.update_one(
                     {"_id": tv_show["_id"]},
-                    {"$set": {
-                        "file_id": file_id,
-                        "message_link": message_link
-                    }}
+                    {"$set": {"file_id": file_id}}
                 )
-                bot.send_message(chat_id, f"Movie file ({file_name}) uploaded successfully.")
 
-        except Exception as e:
-            logging.error(f"Error in file upload process: {e}")
-            bot.send_message(chat_id, "An error occurred while processing your upload. Please try again.")
+                # Forward to storage channel
+                metadata = {
+                    "_id": tv_show["_id"],
+                    "title": tv_show["title"],
+                    "type": "movie",
+                    "language": tv_show["language"]
+                }
+                channel_msg_id = forward_to_storage_channel(bot, file_id, metadata)
+
+                if channel_msg_id:
+                    bot.send_message(chat_id,
+                                     f"Movie file ({file_name}) uploaded and forwarded to channel successfully.")
+                else:
+                    bot.send_message(chat_id,
+                                     f"Movie file ({file_name}) uploaded successfully, but forwarding to channel failed.")
+                return
+            except Exception as e:
+                logging.error(f"Error updating database: {e}")
+                bot.send_message(chat_id, "An error occurred while updating the database.")
+                return
+
+        # For TV shows, extract episode number from filename
+        match = re.match(r"(\d+)", file_name)
+        if not match:
+            bot.send_message(chat_id,
+                             f"Caption '{file_name}' does not follow the expected format. It should start with the episode number (e.g., '1.mp4'). Skipping.")
+            return
+
+        episode_number = int(match.group(1))
+        logging.debug(f"Processing file: {file_name}, Episode: {episode_number}, File ID: {file_id}")
+
+        # TV show handling
+        if item_type == "tv show" and season:
+            try:
+                # Check if this episode already exists
+                existing_episode = tv_shows_collection.find_one(
+                    {
+                        "_id": tv_show["_id"],
+                        "details.seasons.season_number": season["season_number"],
+                        "details.seasons.episodes.episode_number": episode_number
+                    }
+                )
+
+                # If episode exists, update it
+                if existing_episode:
+                    result = tv_shows_collection.update_one(
+                        {
+                            "_id": tv_show["_id"],
+                            "details.seasons.season_number": season["season_number"],
+                            "details.seasons.episodes.episode_number": episode_number
+                        },
+                        {"$set": {"details.seasons.$.episodes.$[ep].file_id": file_id}},
+                        array_filters=[{"ep.episode_number": episode_number}]
+                    )
+                # If not, add it
+                else:
+                    result = tv_shows_collection.update_one(
+                        {"_id": tv_show["_id"], "details.seasons.season_number": season["season_number"]},
+                        {"$push": {
+                            "details.seasons.$.episodes": {"episode_number": episode_number, "file_id": file_id}}}
+                    )
+
+                # Forward to storage channel
+                metadata = {
+                    "_id": tv_show["_id"],
+                    "title": tv_show["title"],
+                    "type": "tv show",
+                    "language": tv_show["language"],
+                    "season_number": season["season_number"],
+                    "episode_number": episode_number
+                }
+                channel_msg_id = forward_to_storage_channel(bot, file_id, metadata)
+
+                if channel_msg_id:
+                    bot.send_message(chat_id,
+                                     f"Episode {episode_number} ({file_name}) uploaded and forwarded to channel successfully.")
+                else:
+                    bot.send_message(chat_id,
+                                     f"Episode {episode_number} ({file_name}) uploaded successfully, but forwarding to channel failed.")
+            except Exception as e:
+                logging.error(f"Error updating database: {e}")
+                bot.send_message(chat_id, "An error occurred while updating the database.")
+        else:
+            bot.send_message(chat_id, "Invalid context for file upload. Please try again.")
 
     # Temporary dictionary to store media group messages
     media_groups = {}
@@ -223,17 +272,20 @@ def register_upload_handlers(bot):
             bot.send_message(chat_id, f"Episode {episode_number} ({file_name}) uploaded successfully.")
 
     def handle_movie_upload(message, movie):
+        """
+        Handles the upload process for a movie.
+        """
         logging.debug(f"Preparing movie upload for: {movie['title']}")
-        bot.send_message(message.chat.id,
-                         f"Uploading files for the movie: {movie['title']}. Please upload the file(s).")
+        bot.send_message(
+            message.chat.id,
+            f"Uploading files for the movie: {movie['title']}. Please upload the file(s)."
+        )
         bot.register_next_step_handler(message, process_file_upload_batch, movie, "movie")
-
-    def navigate_tv_show(bot, message, tv_show, back_callback):
+    def navigate_tv_show(message, tv_show, back_callback):
         """
         Navigates seasons for a selected TV show.
 
         Args:
-            bot: The bot instance.
             message: The message object from the user.
             tv_show: The selected TV show dictionary with details.
             back_callback: The function to call when the user selects 'Back'.
@@ -250,35 +302,59 @@ def register_upload_handlers(bot):
         bot.send_message(message.chat.id, "Select a season:", reply_markup=keyboard)
 
         # Register the next step to handle season selection
-        bot.register_next_step_handler(message, process_season_selection_for_upload, bot, tv_show, back_callback)
+        bot.register_next_step_handler(message, process_season_selection_for_upload, tv_show, back_callback)
 
-    def process_season_selection_for_upload(message, bot, tv_show, back_callback):
+    def process_season_selection_for_upload(message, tv_show, back_callback):
         """
-        Handles the user's selection of a season and initiates batch uploads.
+        Handles the selection of a season for upload.
         """
-        if handle_back(message, navigate_tv_show, bot, tv_show, back_callback):
+        logging.debug(f"Season selection for upload: {message.text}")
+
+        if handle_back(message, back_callback, tv_show):
             return
 
         try:
-            # Extract and validate the selected season number
-            season_number = int(message.text.replace("Season ", "").strip())
-            season = next((s for s in tv_show["details"]["seasons"] if s["season_number"] == season_number), None)
-        except (ValueError, StopIteration):
+            season_text = message.text.strip()
+            season_number = int(season_text.replace("Season ", ""))
+
+            # Find the selected season in the TV show details
+            seasons = tv_show.get("details", {}).get("seasons", [])
+            season = next((s for s in seasons if s["season_number"] == season_number), None)
+
+            if not season:
+                bot.send_message(message.chat.id, "Season not found. Please try again.")
+                navigate_tv_show(message, tv_show, back_callback)
+                return
+
+            # Prompt user to upload files
+            bot.send_message(
+                message.chat.id,
+                f"You selected {tv_show['title']} - Season {season_number}.\n\n"
+                f"Please upload episode files with captions indicating the episode number.\n"
+                f"For example, upload a file with caption '1' for Episode 1."
+            )
+
+            # Set up state for multiple file uploads
+            context = {
+                "tv_show": tv_show,
+                "season_number": season_number,
+                "season": season
+            }
+
+            # Register for the next file upload
+            bot.register_next_step_handler(
+                message,
+                process_file_upload_batch,
+                tv_show,
+                "tv show",
+                season
+            )
+
+        except ValueError:
             bot.send_message(message.chat.id, "Invalid season selection. Please try again.")
-            navigate_tv_show(bot, message, tv_show, back_callback)
+            navigate_tv_show(message, tv_show, back_callback)
             return
 
-        if not season:
-            bot.send_message(message.chat.id, "Invalid season. Please try again.")
-            navigate_tv_show(bot, message, tv_show, back_callback)
-            return
-
-        # Prompt for batch upload
-        bot.send_message(
-            message.chat.id,
-            f"Uploading files for Season {season_number}. Please upload all episodes (e.g., 1.mp4, 2.avi)."
-        )
-        bot.register_next_step_handler(message, process_file_upload_batch, tv_show, "tv show", season)
 
     def process_episode_upload(message, tv_show, season_number, episode_number):
         logging.debug(f"File upload handler triggered for Season {season_number}, Episode {episode_number} of TV Show: {tv_show['title']}")
@@ -307,3 +383,51 @@ def register_upload_handlers(bot):
         except Exception as e:
             logging.error(f"Error during file upload update: {e}")
             bot.send_message(message.chat.id, "An error occurred while uploading.")
+
+    def forward_to_storage_channel(bot, file_id, metadata, caption=None):
+        """
+        Forwards a file to the storage channel and saves the message ID.
+        """
+        try:
+            # Prepare caption if not provided
+            if not caption:
+                caption = f"Title: {metadata['title']}\nType: {metadata['type'].capitalize()}\nLanguage: {metadata['language'].capitalize()}"
+
+                # Add season and episode info for TV shows
+                if metadata.get('season_number') and metadata.get('episode_number'):
+                    caption += f"\nSeason: {metadata['season_number']}\nEpisode: {metadata['episode_number']}"
+
+            # Send the file to the storage channel
+            message = bot.send_document(
+                STORAGE_CHANNEL_ID,
+                file_id,
+                caption=caption
+            )
+
+            logging.debug(f"File forwarded to channel. Message ID: {message.message_id}")
+
+            # Store the message ID in the database
+            if metadata.get('type') == 'movie':
+                movies_collection.update_one(
+                    {"_id": metadata["_id"]},
+                    {"$set": {"channel_message_id": message.message_id}}
+                )
+            elif metadata.get('type') == 'tv show' and metadata.get('season_number') and metadata.get('episode_number'):
+                # For TV shows, we need to update the specific episode
+                tv_shows_collection.update_one(
+                    {
+                        "_id": metadata["_id"],
+                        "details.seasons.season_number": metadata["season_number"],
+                        "details.seasons.episodes.episode_number": metadata["episode_number"]
+                    },
+                    {"$set": {"details.seasons.$[s].episodes.$[e].channel_message_id": message.message_id}},
+                    array_filters=[
+                        {"s.season_number": metadata["season_number"]},
+                        {"e.episode_number": metadata["episode_number"]}
+                    ]
+                )
+
+            return message.message_id
+        except Exception as e:
+            logging.error(f"Error forwarding to storage channel: {e}")
+            return None
