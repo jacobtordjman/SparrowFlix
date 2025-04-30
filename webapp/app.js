@@ -1,110 +1,79 @@
-// Initialize Telegram Mini App
-let tg = window.Telegram.WebApp;
-tg.expand();  // Expand to full screen
+// API interface for SparrowFlix
+const API = {
+    // Use window.location.origin to automatically get the current domain
+    baseUrl: `${window.location.origin}/api`,
 
-// Initialize components
-const player = new Player();
-let movies = [];
-let tvShows = [];
-let filteredContent = [];
-let currentCategory = 'all';
-let searchQuery = '';
+    // Get all movies
+    async getMovies() {
+        try {
+            const response = await fetch(`${this.baseUrl}/movies`);
+            if (!response.ok) throw new Error('Failed to fetch movies');
+            return await response.json();
+        } catch (error) {
+            console.error('Error fetching movies:', error);
+            return [];
+        }
+    },
 
-// DOM elements
-const contentGrid = document.getElementById('content-grid');
-const searchInput = document.getElementById('search-input');
-const categoryButtons = document.querySelectorAll('.category-btn');
+    // Get all TV shows
+    async getTVShows() {
+        try {
+            const response = await fetch(`${this.baseUrl}/tvshows`);
+            if (!response.ok) throw new Error('Failed to fetch TV shows');
+            return await response.json();
+        } catch (error) {
+            console.error('Error fetching TV shows:', error);
+            return [];
+        }
+    },
 
-// Function to render content in grid
-function renderContent() {
-    contentGrid.innerHTML = '';
+    // Get streaming URL for a movie
+    async getMovieStreamUrl(movieId) {
+        try {
+            const response = await fetch(`${this.baseUrl}/stream/movie/${movieId}`);
+            if (!response.ok) throw new Error('Failed to get movie stream URL');
+            return await response.json();
+        } catch (error) {
+            console.error('Error getting movie stream URL:', error);
+            return null;
+        }
+    },
 
-    if (filteredContent.length === 0) {
-        contentGrid.innerHTML = '<div class="no-content">No content available</div>';
-        return;
+    // Get streaming URL for a TV show episode
+    async getEpisodeStreamUrl(showId, seasonNumber, episodeNumber) {
+        try {
+            const response = await fetch(
+                `${this.baseUrl}/stream/tvshow/${showId}/season/${seasonNumber}/episode/${episodeNumber}`
+            );
+            if (!response.ok) throw new Error('Failed to get episode stream URL');
+            return await response.json();
+        } catch (error) {
+            console.error('Error getting episode stream URL:', error);
+            return null;
+        }
+    },
+
+    // Get TV show season details
+    async getTVShowDetails(showId) {
+        try {
+            const response = await fetch(`${this.baseUrl}/tvshow/${showId}`);
+            if (!response.ok) throw new Error('Failed to fetch TV show details');
+            return await response.json();
+        } catch (error) {
+            console.error('Error fetching TV show details:', error);
+            return null;
+        }
+    },
+
+    // Search for content
+    async searchContent(query) {
+        try {
+            const response = await fetch(`${this.baseUrl}/search?q=${encodeURIComponent(query)}`);
+            if (!response.ok) throw new Error('Failed to search content');
+            return await response.json();
+        } catch (error) {
+            console.error('Error searching content:', error);
+            return { movies: [], tvShows: [] };
+        }
     }
-
-    filteredContent.forEach(item => {
-        const type = item.details?.seasons ? 'tvshow' : 'movie';
-        const card = new MovieCard(item, type, (item, type) => {
-            if (type === 'movie') {
-                player.playMovie(item);
-            } else {
-                player.playTVShow(item);
-            }
-        });
-
-        contentGrid.appendChild(card.render());
-    });
-}
-
-// Function to filter content based on category and search
-function filterContent() {
-    if (currentCategory === 'all') {
-        filteredContent = [...movies, ...tvShows];
-    } else if (currentCategory === 'movies') {
-        filteredContent = [...movies];
-    } else if (currentCategory === 'tvshows') {
-        filteredContent = [...tvShows];
-    }
-
-    if (searchQuery) {
-        const query = searchQuery.toLowerCase();
-        filteredContent = filteredContent.filter(item => {
-            const title = (item.details?.name || item.title || '').toLowerCase();
-            return title.includes(query);
-        });
-    }
-
-    renderContent();
-}
-
-// Event listeners for category buttons
-categoryButtons.forEach(button => {
-    button.addEventListener('click', () => {
-        // Remove active class from all buttons
-        categoryButtons.forEach(btn => btn.classList.remove('active'));
-
-        // Add active class to clicked button
-        button.classList.add('active');
-
-        // Update current category
-        currentCategory = button.dataset.category;
-
-        // Filter and render content
-        filterContent();
-    });
-});
-
-// Event listener for search input
-searchInput.addEventListener('input', (e) => {
-    searchQuery = e.target.value.trim();
-    filterContent();
-});
-
-// Function to load initial data
-async function loadData() {
-    // Show loading state
-    contentGrid.innerHTML = '<div class="loading">Loading content...</div>';
-
-    try {
-        const [moviesData, tvShowsData] = await Promise.all([
-            API.getMovies(),
-            API.getTVShows()
-        ]);
-
-        movies = moviesData || [];
-        tvShows = tvShowsData || [];
-
-        // Filter and render content
-        filterContent();
-    } catch (error) {
-        console.error('Error loading data:', error);
-        contentGrid.innerHTML = '<div class="error">Error loading content. Please try again.</div>';
-    }
-}
-
-// Initialize app
-document.addEventListener('DOMContentLoaded', () => {
-    loadData();
-});
+};
