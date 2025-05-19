@@ -1,10 +1,10 @@
 services:
   - name: my-bot
-    type: worker  # Specifies that this is a background worker, not a web service
+    type: web_service
     runtime: python
     plan: free    # Uses the free plan
     buildCommand: "pip install -r requirements.txt"  # Command to install dependencies
-    startCommand: "python bot.py"  # Command to start your bot
+    startCommand: "gunicorn bot:app --bind 0.0.0.0:$PORT"  # Command to start your bot
     envVars:
       - key: BOT_TOKEN
         value: "6533479070:AAE7Z2iBtdy8O54rqhoZc3H3Df-OkPdeG7U"
@@ -22,3 +22,6 @@ services:
         value: "https://sparrowflix.onrender.com/webhook"
       - key: PROD_PORT
         value: "10000"
+      - key: STORAGE_CHANNEL_ID
+        value: "-1002555400542"
+
