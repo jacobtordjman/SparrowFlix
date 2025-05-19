@@ -47,6 +47,7 @@ def serve_app():
     return send_from_directory('webapp', 'index.html')
 
 
+
 # Graceful shutdown flag
 stop_bot = False
 
