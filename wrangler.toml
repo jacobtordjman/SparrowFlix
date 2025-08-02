@@ -1,0 +1,20 @@
+main = "functions/index.js"        # stub entry-point
+
+name              = "sparrowflix"
+account_id        = "2eff6645caa146eee5d4b8bd40919aa7"
+compatibility_date = "2025-07-30"
+compatibility_flags = ["nodejs_compat"]
+
+# THIS IS THE CORRECT FUNCTIONS DIRECTIVE:
+functions = "./functions"
+
+[site]
+  bucket = "./web"
+
+[[kv_namespaces]]
+  binding = "FILEPATH_CACHE"
+  id      = "43ae63fc39714fc0b93fb7e1e14167a7"
+
+[[kv_namespaces]]
+  binding = "TICKETS"
+  id      = "69896c9e8dfa4fe79beabc6a7ddbee30"

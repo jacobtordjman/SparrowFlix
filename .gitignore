@@ -1,1 +1,101 @@
-/.venv/
+# -----------------------
+# OS junk
+# -----------------------
+.DS_Store
+Thumbs.db
+
+# -----------------------
+# Python
+# -----------------------
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.coverage*
+htmlcov/
+.tox/
+.mypy_cache/
+.pyre/
+.pytype/
+.hypothesis/
+.cache/
+.ruff_cache/
+pip-wheel-metadata/
+*.egg-info/
+.eggs/
+dist/
+build/
+__pypackages__/        # PEP 582
+.site-packages/
+
+# Virtual envs
+.venv/
+venv/
+env/
+ENV/
+
+# -----------------------
+# Secrets & local config
+# -----------------------
+.env
+.env.*
+!.env.example          # keep a template in git
+*.secret
+*.key
+*.pem
+*.crt
+*.p12
+
+# -----------------------
+# Logs, PIDs, runtime
+# -----------------------
+*.log
+logs/
+*.pid
+*.pid.lock
+
+# -----------------------
+# DB & sessions
+# -----------------------
+*.sqlite3
+*.db
+*.db-journal
+*.session
+*.session-journal
+
+# -----------------------
+# Editors/IDEs
+# -----------------------
+.idea/
+.vscode/
+*.code-workspace
+
+# -----------------------
+# Frontend / webapp (generic)
+# -----------------------
+node_modules/
+.npm/
+.pnpm-store/
+.next/
+.nuxt/
+.vite/
+.sass-cache/
+dist/
+build/
+coverage/
+*.tsbuildinfo
+yarn-error.log
+
+# If your frontend lives under /webapp/, these rules still catch it.
+# (render.yaml should STAY tracked)
+
+# -----------------------
+# Archives & temp
+# -----------------------
+*.zip
+*.tar
+*.tar.gz
+*.tmp
+*.swp
+*~
+*.orig
