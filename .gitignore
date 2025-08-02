@@ -85,6 +85,7 @@ build/
 coverage/
 *.tsbuildinfo
 yarn-error.log
+legacey/render.yaml
 
 # If your frontend lives under /webapp/, these rules still catch it.
 # (render.yaml should STAY tracked)
