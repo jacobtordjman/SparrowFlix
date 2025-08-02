@@ -99,3 +99,4 @@ yarn-error.log
 *.swp
 *~
 *.orig
+.env
