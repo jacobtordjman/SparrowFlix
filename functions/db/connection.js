@@ -23,7 +23,8 @@ export class MongoDBDataAPI {
     });
 
     if (!response.ok) {
-      throw new Error(`MongoDB API error: ${response.status}`);
+      const error = await response.text();
+      throw new Error(`MongoDB API error: ${response.status} - ${error}`);
     }
 
     return await response.json();
@@ -36,14 +37,20 @@ export class MongoDBDataAPI {
         return result.document;
       },
       
-      find: async (filter = {}, options = {}) => {
-        const result = await this.request('find', name, {
-          filter,
-          limit: options.limit || 50,
-          sort: options.sort || {}
-        });
+      find: (filter = {}, options = {}) => {
         return {
-          toArray: async () => result.documents || []
+          limit: function(n) {
+            options.limit = n;
+            return this;
+          },
+          toArray: async () => {
+            const result = await this.request('find', name, {
+              filter,
+              limit: options.limit || 50,
+              sort: options.sort || {}
+            });
+            return result.documents || [];
+          }
         };
       },
       
@@ -59,13 +66,17 @@ export class MongoDBDataAPI {
         });
       },
       
-      deleteOne: async (filter) => {
-        return await this.request('deleteOne', name, { filter });
+      findOneAndUpdate: async (filter, update, options = {}) => {
+        return await this.request('findOneAndUpdate', name, {
+          filter,
+          update,
+          upsert: options.upsert || false,
+          returnDocument: options.returnDocument || 'after'
+        });
       },
       
-      aggregate: async (pipeline) => {
-        const result = await this.request('aggregate', name, { pipeline });
-        return result.documents || [];
+      deleteOne: async (filter) => {
+        return await this.request('deleteOne', name, { filter });
       }
     };
   }

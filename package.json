@@ -9,10 +9,6 @@
     "deploy": "wrangler deploy",
     "tail": "wrangler tail"
   },
-  "dependencies": {
-    "mongodb": "^6.3.0",
-    "dotenv": "^16.0.3"
-  },
   "devDependencies": {
     "wrangler": "^3.0.0"
   }
