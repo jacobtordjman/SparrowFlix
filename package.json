@@ -8,7 +8,7 @@
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
     "tail": "wrangler tail",
-    "test": "echo \"No tests yet\"",
+    "test": "node --test tests",
     "lint": "eslint functions docs/js"
   },
   "dependencies": {
@@ -16,7 +16,7 @@
     "mongodb": "^5.8.0"
   },
   "devDependencies": {
-      "eslint": "^9.0.0",
+    "eslint": "^9.0.0",
     "wrangler": "^3.0.0"
   }
 }
