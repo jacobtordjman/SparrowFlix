@@ -1,20 +1,33 @@
-main = "functions/index.js"        # stub entry-point
-
-name              = "sparrowflix"
-account_id        = "2eff6645caa146eee5d4b8bd40919aa7"
+# ─ top-level (for default env if you ever publish without --env)
+name               = "sparrowflix"
+main               = "functions/index.js"
+account_id         = "2eff6645caa146eee5d4b8bd40919aa7"
 compatibility_date = "2025-07-30"
-compatibility_flags = ["nodejs_compat"]
+compatibility_flags= ["nodejs_compat"]
 
-# THIS IS THE CORRECT FUNCTIONS DIRECTIVE:
-functions = "./functions"
+# ——— Production ENV ———
+[env.production]
+name   = "sparrowflix"
 
-[site]
-  bucket = "./web"
 
-[[kv_namespaces]]
-  binding = "FILEPATH_CACHE"
-  id      = "43ae63fc39714fc0b93fb7e1e14167a7"
+# Re-define your KV namespaces here:
+[[env.production.kv_namespaces]]
+binding = "FILEPATH_CACHE"
+id      = "43ae63fc39714fc0b93fb7e1e14167a7"
 
-[[kv_namespaces]]
-  binding = "TICKETS"
-  id      = "69896c9e8dfa4fe79beabc6a7ddbee30"
+[[env.production.kv_namespaces]]
+binding = "TICKETS"
+id      = "69896c9e8dfa4fe79beabc6a7ddbee30"
+
+# ——— Development ENV ———
+[env.development]
+name        = "sparrowflix-dev"
+workers_dev = true
+
+[[env.development.kv_namespaces]]
+binding = "FILEPATH_CACHE"
+id      = "43ae63fc39714fc0b93fb7e1e14167a7"
+
+[[env.development.kv_namespaces]]
+binding = "TICKETS"
+id      = "69896c9e8dfa4fe79beabc6a7ddbee30"

@@ -54,7 +54,8 @@ export default {
       }
 
       // Serve static files from /web for all other routes
-      return env.ASSETS.fetch(request);
+      return new Response('Not found', { status: 404 });
+
 
     } catch (error) {
       console.error('Worker error:', error);

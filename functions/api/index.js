@@ -4,7 +4,7 @@ import { verifyTelegramWebAppData } from '../utils/auth.js';
 import { handleChannelsApi } from './channels.js';
 
 export async function handleApiRequest(request, env, path) {
-  const db = await connectDB(env.MONGO_URI);
+  const db = await connectDB(env);
   const url = new URL(request.url);
   
   // Extract API path
