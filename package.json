@@ -7,9 +7,16 @@
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
-    "tail": "wrangler tail"
+    "tail": "wrangler tail",
+    "test": "echo \"No tests yet\"",
+    "lint": "eslint functions docs/js"
+  },
+  "dependencies": {
+    "dotenv": "^16.0.3",
+    "mongodb": "^5.8.0"
   },
   "devDependencies": {
+      "eslint": "^9.0.0",
     "wrangler": "^3.0.0"
   }
 }

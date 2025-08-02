@@ -18,7 +18,7 @@ export async function handleTelegramWebhook(request, env) {
     console.log('Update:', JSON.stringify(update));
     
     // Initialize bot with environment
-    const bot = new Bot(env.BOT_TOKEN || env.TELEGRAM_BOT_TOKEN, env);
+    const bot = new Bot(env.BOT_TOKEN, env);
     
     // Connect to database
     const db = await connectDB(env);

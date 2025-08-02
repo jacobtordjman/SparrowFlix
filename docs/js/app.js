@@ -2,7 +2,7 @@
 class SparrowFlix {
     constructor() {
         this.tg = window.Telegram.WebApp;
-        this.apiUrl = 'https://sparrowflix.jaketur.workers.dev/api';
+        this.apiUrl = window.SPARROWFLIX_API_URL || `${window.location.origin}/api`;
         this.content = { movies: [], shows: [] };
         this.watchHistory = [];
         this.currentUser = null;
