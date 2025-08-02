@@ -1,30 +1,23 @@
-import os, re, json, time, logging, requests
+import os, re, json, time, logging
 from datetime import datetime
 from telebot import TeleBot
 from dotenv import load_dotenv
 
 load_dotenv()
-BOT_TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
+BOT_TOKEN = os.environ["BOT_TOKEN"]
 CHANNEL_ID = int(os.environ["STORAGE_CHANNEL_ID"])
 
-# Mongo Data API
-APP_ID = os.environ["MONGODB_APP_ID"]
-API_KEY = os.environ["MONGODB_API_KEY"]
-DATA_SOURCE = os.environ["MONGODB_DATA_SOURCE"]
-DB = os.environ.get("MONGODB_DATABASE","sparrowflix")
-COL_MOV = os.environ.get("MONGODB_COLLECTION_MOVIES","movies")
-COL_TV = os.environ.get("MONGODB_COLLECTION_TV","tv_shows")
-DATA_API = f"https://data.mongodb-api.com/app/{APP_ID}/endpoint/data/v1"
+MONGO_URI = os.environ["MONGO_URI"]
+DB = os.environ.get("MONGODB_DATABASE", "sparrowflix")
+COL_MOV = os.environ.get("MONGODB_COLLECTION_MOVIES", "movies")
+COL_TV = os.environ.get("MONGODB_COLLECTION_TV", "tv_shows")
 
-def data_api(action, payload):
-    r = requests.post(f"{DATA_API}/action/{action}", json={
-        "dataSource": DATA_SOURCE, "database": DB, **payload
-    }, headers={"api-key": API_KEY, "Content-Type":"application/json"})
-    r.raise_for_status()
-    return r.json()
+from pymongo import MongoClient
+client = MongoClient(MONGO_URI)
+db = client[DB]
 
 def insert_one(collection, doc):
-    return data_api("insertOne", {"collection": collection, "document": doc})
+    return db[collection].insert_one(doc)
 
 bot = TeleBot(BOT_TOKEN, parse_mode="HTML")
 

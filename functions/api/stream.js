@@ -1,7 +1,7 @@
-// In the getTelegramFileUrl function, add env parameter
+// functions/api/stream.js
+
 async function getTelegramFileUrl(env, botToken, fileId) {
   try {
-    // Check cache first
     const cached = await env.FILEPATH_CACHE.get(fileId);
     if (cached) {
       const data = JSON.parse(cached);
@@ -10,34 +10,54 @@ async function getTelegramFileUrl(env, botToken, fileId) {
       }
     }
 
-    // Get file path from Telegram
     const response = await fetch(
       `https://api.telegram.org/bot${botToken}/getFile?file_id=${fileId}`
     );
-    
     const data = await response.json();
-    
+
     if (!data.ok || !data.result) {
       throw new Error('Failed to get file info');
     }
-    
+
     const fileUrl = `https://api.telegram.org/file/bot${botToken}/${data.result.file_path}`;
-    
-    // Cache for 1 hour
-    await env.FILEPATH_CACHE.put(fileId, JSON.stringify({
-      url: fileUrl,
-      expiresAt: Date.now() + (60 * 60 * 1000)
-    }), {
-      expirationTtl: 3600
-    });
-    
+
+    await env.FILEPATH_CACHE.put(
+      fileId,
+      JSON.stringify({ url: fileUrl, expiresAt: Date.now() + 60 * 60 * 1000 }),
+      { expirationTtl: 3600 }
+    );
+
     return fileUrl;
-    
   } catch (error) {
     console.error('Error getting Telegram file URL:', error);
     return null;
   }
 }
 
-// Update the call to include env
-const fileUrl = await getTelegramFileUrl(env, env.BOT_TOKEN || env.TELEGRAM_BOT_TOKEN, fileId);
+export async function handleStreamRequest(request, env) {
+  const url = new URL(request.url);
+  const fileId = url.pathname.split('/').pop();
+
+  if (!fileId) {
+    return new Response('File ID required', { status: 400 });
+  }
+
+  const fileUrl = await getTelegramFileUrl(env, env.BOT_TOKEN, fileId);
+  if (!fileUrl) {
+    return new Response('Not found', { status: 404 });
+  }
+
+  const tgResponse = await fetch(fileUrl);
+  if (!tgResponse.ok || !tgResponse.body) {
+    return new Response('Failed to fetch file', { status: tgResponse.status });
+  }
+
+  return new Response(tgResponse.body, {
+    status: 200,
+    headers: {
+      'Content-Type': tgResponse.headers.get('Content-Type') || 'application/octet-stream',
+      'Content-Length': tgResponse.headers.get('Content-Length') || undefined,
+      'Cache-Control': 'public, max-age=86400'
+    }
+  });
+}

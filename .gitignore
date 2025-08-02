@@ -39,7 +39,7 @@ ENV/
 # -----------------------
 .env
 .env.*
-!.env.example          # keep a template in git
+!/.env.example          # keep a template in git
 *.secret
 *.key
 *.pem
