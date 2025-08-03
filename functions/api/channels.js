@@ -1,5 +1,4 @@
 // functions/api/channels.js
-import { connectDB } from '../db/connection.js';
 
 export async function handleChannelsApi(request, db, params, user) {
     const [action, channelId] = params;
@@ -109,20 +108,32 @@ async function generateSchedule(db, channel) {
     const now = new Date();
     let currentTime = new Date(now);
     currentTime.setHours(0, 0, 0, 0); // Start from midnight
-    
+
     // Get random content
     const movies = await db.collection('movies')
         .find({ file_id: { $exists: true } })
         .toArray();
-    
-    const shows = await db.collection('tv_shows')
-        .find({ 'details.seasons.episodes.file_id': { $exists: true } })
-        .toArray();
-    
+    const [shows, episodes] = await Promise.all([
+        db.collection('tv_shows').find({}).toArray(),
+        db.collection('episodes').find({ file_id: { $exists: true } }).toArray()
+    ]);
+
+    // Group episodes by their show
+    const episodesByShow = {};
+    episodes.forEach(ep => {
+        if (!episodesByShow[ep.show_id]) {
+            episodesByShow[ep.show_id] = [];
+        }
+        episodesByShow[ep.show_id].push(ep);
+    });
+
+    // Only keep shows that actually have episodes
+    const availableShows = shows.filter(show => episodesByShow[show.id]);
+
     // Mix content for 24 hours
     while (currentTime < new Date(now.getTime() + 24 * 60 * 60 * 1000)) {
         const useMovie = Math.random() > 0.3; // 70% movies, 30% TV
-        
+
         if (useMovie && movies.length > 0) {
             const movie = movies[Math.floor(Math.random() * movies.length)];
             const duration = movie.details?.runtime || 120; // Default 2 hours
@@ -140,34 +151,22 @@ async function generateSchedule(db, channel) {
             
             currentTime = new Date(currentTime.getTime() + duration * 60 * 1000);
             
-        } else if (shows.length > 0) {
-            // Play 3-5 episodes of a show
-            const show = shows[Math.floor(Math.random() * shows.length)];
+        } else if (availableShows.length > 0) {
+            // Play 3-5 episodes of a random show
+            const show = availableShows[Math.floor(Math.random() * availableShows.length)];
+            const showEpisodes = episodesByShow[show.id];
             const episodeCount = 3 + Math.floor(Math.random() * 3);
-            
-            // Get available episodes
-            const episodes = [];
-            show.details?.seasons?.forEach(season => {
-                Object.values(season.episodes || {}).forEach(ep => {
-                    if (ep.file_id) {
-                        episodes.push({
-                            ...ep,
-                            season_number: season.season_number,
-                            show_title: show.title,
-                            show_id: show._id
-                        });
-                    }
-                });
-            });
-            
-            if (episodes.length > 0) {
-                for (let i = 0; i < Math.min(episodeCount, episodes.length); i++) {
-                    const episode = episodes[i];
+
+            if (showEpisodes && showEpisodes.length > 0) {
+                // Shuffle episodes to vary schedule
+                const shuffled = [...showEpisodes].sort(() => Math.random() - 0.5);
+                for (let i = 0; i < Math.min(episodeCount, shuffled.length); i++) {
+                    const episode = shuffled[i];
                     const duration = 45; // Default 45 minutes per episode
-                    
+
                     schedule.push({
                         type: 'episode',
-                        content_id: show._id,
+                        content_id: show.id,
                         season: episode.season_number,
                         episode: episode.episode_number,
                         title: `${show.title} - S${episode.season_number}E${episode.episode_number}`,
@@ -177,7 +176,7 @@ async function generateSchedule(db, channel) {
                         start_time: new Date(currentTime),
                         end_time: new Date(currentTime.getTime() + duration * 60 * 1000)
                     });
-                    
+
                     currentTime = new Date(currentTime.getTime() + duration * 60 * 1000);
                 }
             }
