@@ -2,6 +2,7 @@
 import { connectDB } from '../db/connection.js';
 import { verifyTelegramWebAppData } from '../utils/auth.js';
 import { handleChannelsApi } from './channels.js';
+import { handleTicketApi } from './ticket.js';
 
 export async function handleApiRequest(request, env, path) {
   const db = await connectDB(env);
@@ -51,12 +52,13 @@ export async function handleApiRequest(request, env, path) {
         return await handleWatchApi(request, db, params, user);
 
       case 'ticket':
-        return await handleTicketApi(request, db, env, params, user);
-      
+
+        return await handleTicketApi(request, env, params, user);
+
       case 'channels':
-        return await handleChannelsApi(request, db, params, user);
+        return await handleChannelsApi(request, db, params, user, env);
       
-      default:
+      default
         return {
           body: JSON.stringify({ error: 'Not found' }),
           status: 404,
@@ -414,7 +416,6 @@ async function handleTicketApi(request, db, env, params, user) {
     headers: { 'Content-Type': 'application/json' }
   };
 }
-
 // Helper functions
 function formatMovie(movie) {
   return {
@@ -447,10 +448,4 @@ function formatTVShow(show) {
     genres: show.details?.genres || [],
     language: show.language
   };
-}
-
-function generateTicketId() {
-  return Array.from(crypto.getRandomValues(new Uint8Array(16)))
-    .map(b => b.toString(16).padStart(2, '0'))
-    .join('');
 }
