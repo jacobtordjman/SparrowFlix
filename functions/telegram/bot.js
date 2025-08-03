@@ -1,10 +1,13 @@
-// functions/telegram/bot.js
+// functions/telegram/bot.js - Enhanced with private channel support
 export class Bot {
   constructor(token, env) {
     this.token = token;
     this.env = env;
     this.apiUrl = `https://api.telegram.org/bot${token}`;
     this.db = null;
+    
+    // Use your private channel for storage
+    this.storageChannel = env.STORAGE_CHANNEL_ID; // -1002555400542
   }
 
   setDB(db) {
@@ -12,10 +15,14 @@ export class Bot {
   }
 
   async handleUpdate(update) {
-    if (update.message) {
-      await this.handleMessage(update.message);
-    } else if (update.callback_query) {
-      await this.handleCallbackQuery(update.callback_query);
+    try {
+      if (update.message) {
+        await this.handleMessage(update.message);
+      } else if (update.callback_query) {
+        await this.handleCallbackQuery(update.callback_query);
+      }
+    } catch (error) {
+      console.error('Bot update error:', error);
     }
   }
 
@@ -34,6 +41,8 @@ export class Bot {
       await this.handleUpload(chatId);
     } else if (text === 'Fetch') {
       await this.handleFetch(chatId);
+    } else if (text === '🎬 Open Streaming App') {
+      await this.sendMiniApp(chatId);
     }
 
     // Handle file uploads
@@ -53,10 +62,12 @@ export class Bot {
       one_time_keyboard: false
     };
 
-    await this.sendMessage(chatId, 
-      '🎬 Welcome to SparrowFlix!\n\nChoose an option:',
-      { reply_markup: keyboard }
-    );
+    const welcomeMessage = `🎬 Welcome to SparrowFlix!\n\n` +
+      `📁 Private storage channel configured\n` +
+      `🔒 Your content remains completely private\n\n` +
+      `Choose an option:`;
+
+    await this.sendMessage(chatId, welcomeMessage, { reply_markup: keyboard });
   }
 
   async sendMiniApp(chatId) {
@@ -64,7 +75,7 @@ export class Bot {
       inline_keyboard: [[
         {
           text: '🍿 Open SparrowFlix Streaming 🍿',
-          web_app: { url: `${this.env.APP_URL}` }
+          web_app: { url: this.env.MINI_APP_URL || `https://t.me/${this.env.BOT_USERNAME}/app` }
         }
       ]]
     };
@@ -87,26 +98,31 @@ export class Bot {
       
       if (!context) {
         await this.sendMessage(chatId, 
-          '❌ No upload session active. Please start with /start'
+          '❌ No upload session active. Please start with "Add New Title" first.'
         );
         return;
       }
 
-      // Store file info
-      const fileData = {
-        file_id: file.file_id,
-        file_name: file.file_name || 'video',
-        mime_type: file.mime_type,
-        file_size: file.file_size,
-        caption: message.caption || ''
-      };
+      // Create metadata caption for private channel
+      const caption = this.createFileCaption(context, message.caption, file);
 
-      // Forward to storage channel
+      // Forward to private storage channel
       const forwarded = await this.forwardMessage(
-        this.env.STORAGE_CHANNEL_ID,
+        this.storageChannel,
         chatId,
         message.message_id
       );
+
+      if (!forwarded.ok) {
+        throw new Error('Failed to forward to storage channel');
+      }
+
+      // Add caption as reply in channel for metadata
+      if (caption) {
+        await this.sendMessage(this.storageChannel, caption, {
+          reply_to_message_id: forwarded.result.message_id
+        });
+      }
 
       // Update database based on content type
       if (context.type === 'movie') {
@@ -115,13 +131,19 @@ export class Bot {
           { 
             $set: { 
               file_id: file.file_id,
-              channel_message_id: forwarded.message_id,
+              storage_channel_id: this.storageChannel,
+              storage_message_id: forwarded.result.message_id,
+              file_info: {
+                name: file.file_name || 'video',
+                size: file.file_size,
+                mime_type: file.mime_type
+              },
               uploaded_at: new Date()
             }
           }
         );
         
-        await this.sendMessage(chatId, '✅ Movie uploaded successfully!');
+        await this.sendMessage(chatId, '✅ Movie uploaded to private storage!');
         
         // Clear context
         await this.env.FILEPATH_CACHE.delete(`upload_${chatId}`);
@@ -131,7 +153,7 @@ export class Bot {
         const episodeMatch = message.caption?.match(/[Ee](\d+)/);
         if (!episodeMatch) {
           await this.sendMessage(chatId, 
-            '❌ Please include episode number in caption (e.g., E01)'
+            '❌ Please include episode number in caption (e.g., E01 or Episode 1)'
           );
           return;
         }
@@ -149,7 +171,13 @@ export class Bot {
               [`details.seasons.$.episodes.${episodeNum}`]: {
                 episode_number: episodeNum,
                 file_id: file.file_id,
-                channel_message_id: forwarded.message_id,
+                storage_channel_id: this.storageChannel,
+                storage_message_id: forwarded.result.message_id,
+                file_info: {
+                  name: file.file_name || `episode_${episodeNum}`,
+                  size: file.file_size,
+                  mime_type: file.mime_type
+                },
                 uploaded_at: new Date()
               }
             }
@@ -157,18 +185,43 @@ export class Bot {
         );
         
         await this.sendMessage(chatId, 
-          `✅ Episode ${episodeNum} uploaded!\n\n` +
-          `Send more episodes or type /done to finish.`
+          `✅ Episode ${episodeNum} uploaded to private storage!\n\n` +
+          `Send more episodes or use "Add New Title" for a different show.`
         );
       }
 
     } catch (error) {
       console.error('File upload error:', error);
-      await this.sendMessage(chatId, '❌ Upload failed. Please try again.');
+      await this.sendMessage(chatId, 
+        '❌ Upload failed. Please try again.\n' +
+        'Make sure the bot has admin access to the storage channel.'
+      );
     }
   }
 
-  // Telegram API methods
+  createFileCaption(context, userCaption, file) {
+    const metadata = [
+      `🎬 ${context.title}`,
+      `📁 Type: ${context.type}`,
+      `🆔 Content ID: ${context.content_id}`,
+      context.season ? `📺 Season: ${context.season}` : '',
+      `📄 File: ${file.file_name || 'video'}`,
+      `💾 Size: ${this.formatFileSize(file.file_size)}`,
+      userCaption ? `📝 Caption: ${userCaption}` : '',
+      `⏰ Uploaded: ${new Date().toISOString()}`
+    ].filter(Boolean);
+
+    return metadata.join('\n');
+  }
+
+  formatFileSize(bytes) {
+    if (!bytes) return 'Unknown';
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(1024));
+    return Math.round(bytes / Math.pow(1024, i) * 100) / 100 + ' ' + sizes[i];
+  }
+
+  // Keep your existing Telegram API methods
   async sendMessage(chatId, text, options = {}) {
     const body = {
       chat_id: chatId,
@@ -199,8 +252,7 @@ export class Bot {
       body: JSON.stringify(body)
     });
 
-    const result = await response.json();
-    return result.result;
+    return await response.json();
   }
 
   async answerCallbackQuery(callbackQueryId, text = null) {

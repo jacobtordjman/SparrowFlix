@@ -9,8 +9,22 @@ compatibility_flags= ["nodejs_compat"]
 [env.production]
 name   = "sparrowflix"
 
+# Environment variables for production
+[env.production.vars]
+MONGODB_APP_ID = "sparrowflixapi-lyutpvp"
+MONGODB_DATA_SOURCE = "Cluster0"
+MONGODB_DATABASE = "sparrowflix"
+BOT_USERNAME = "sparrowflix_bot"
+MINI_APP_URL = "https://t.me/sparrowflix_bot/app"
 
-# Re-define your KV namespaces here:
+# Secrets (set with: wrangler secret put SECRET_NAME)
+# BOT_TOKEN = "your-bot-token"
+# MONGODB_API_KEY = "your-mongodb-api-key" 
+# STORAGE_CHANNEL_ID = "your-channel-id"
+# TMDB_API_KEY = "your-tmdb-api-key"
+# WEBHOOK_SECRET = "your-webhook-secret"
+
+# KV namespaces for production
 [[env.production.kv_namespaces]]
 binding = "FILEPATH_CACHE"
 id      = "43ae63fc39714fc0b93fb7e1e14167a7"
@@ -24,6 +38,16 @@ id      = "69896c9e8dfa4fe79beabc6a7ddbee30"
 name        = "sparrowflix-dev"
 workers_dev = true
 
+# Environment variables for development
+[env.development.vars]
+MONGODB_APP_ID = "sparrowflixapi-lyutpvp"
+MONGODB_DATA_SOURCE = "Cluster0"
+MONGODB_DATABASE = "sparrowflix"
+BOT_USERNAME = "sparrowflix_bot"
+MINI_APP_URL = "https://t.me/sparrowflix_bot/app"
+DEV_NO_AUTH = "true"
+
+# KV namespaces for development
 [[env.development.kv_namespaces]]
 binding = "FILEPATH_CACHE"
 id      = "43ae63fc39714fc0b93fb7e1e14167a7"

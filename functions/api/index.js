@@ -1,4 +1,4 @@
-// functions/api/index.js
+// functions/api/index.js - Updated with proper auth handling
 import { connectDB } from '../db/connection.js';
 import { verifyTelegramWebAppData } from '../utils/auth.js';
 import { handleChannelsApi } from './channels.js';
@@ -11,19 +11,29 @@ export async function handleApiRequest(request, env, path) {
   const apiPath = path.replace('/api/', '');
   const [resource, ...params] = apiPath.split('/');
 
-  // Verify Telegram authentication for protected routes
+  // Define which routes require authentication
+  const protectedRoutes = ['user', 'watch', 'ticket'];
+  const requiresAuth = protectedRoutes.includes(resource);
+
+  // Verify Telegram authentication only for protected routes
   const authHeader = request.headers.get('X-Telegram-Init-Data');
   let user = null;
   
   if (authHeader) {
     user = verifyTelegramWebAppData(authHeader, env.BOT_TOKEN);
-    if (!user) {
+    if (!user && requiresAuth) {
       return {
         body: JSON.stringify({ error: 'Unauthorized' }),
         status: 401,
         headers: { 'Content-Type': 'application/json' }
       };
     }
+  } else if (requiresAuth) {
+    return {
+      body: JSON.stringify({ error: 'Authentication required' }),
+      status: 401,
+      headers: { 'Content-Type': 'application/json' }
+    };
   }
 
   try {
@@ -56,36 +66,54 @@ export async function handleApiRequest(request, env, path) {
   } catch (error) {
     console.error('API error:', error);
     return {
-      body: JSON.stringify({ error: 'Internal server error' }),
+      body: JSON.stringify({ 
+        error: 'Internal server error',
+        details: error.message 
+      }),
       status: 500,
       headers: { 'Content-Type': 'application/json' }
     };
   }
 }
 
+// Rest of your existing functions stay the same...
 async function handleContentApi(request, db, params, user) {
   const [type, id] = params;
   
   if (!type) {
-    // Get all content
-    const movies = await db.collection('movies')
-      .find({ file_id: { $exists: true } })
-      .limit(50)
-      .toArray();
-    
-    const shows = await db.collection('tv_shows')
-      .find({ 'details.seasons.episodes.file_id': { $exists: true } })
-      .limit(50)
-      .toArray();
-    
-    return {
-      body: JSON.stringify({
-        movies: movies.map(formatMovie),
-        shows: shows.map(formatTVShow)
-      }),
-      status: 200,
-      headers: { 'Content-Type': 'application/json' }
-    };
+    // Get all content - this should work without auth now
+    try {
+      const movies = await db.collection('movies')
+        .find({ file_id: { $exists: true } })
+        .limit(50)
+        .toArray();
+      
+      const shows = await db.collection('tv_shows')
+        .find({ 'details.seasons.episodes.file_id': { $exists: true } })
+        .limit(50)
+        .toArray();
+      
+      console.log(`Found ${movies.length} movies and ${shows.length} shows`);
+      
+      return {
+        body: JSON.stringify({
+          movies: movies.map(formatMovie),
+          shows: shows.map(formatTVShow)
+        }),
+        status: 200,
+        headers: { 'Content-Type': 'application/json' }
+      };
+    } catch (error) {
+      console.error('Content fetch error:', error);
+      return {
+        body: JSON.stringify({ 
+          error: 'Failed to fetch content',
+          details: error.message 
+        }),
+        status: 500,
+        headers: { 'Content-Type': 'application/json' }
+      };
+    }
   }
 
   if (type === 'movie' && id) {
