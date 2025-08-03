@@ -1,4 +1,4 @@
-// functions/db/connection.js - D1 Database wrapper (REPLACE MongoDB version)
+// functions/db/connection.js - Fixed D1 Database wrapper
 export async function connectDB(env) {
   // D1 database wrapper to match MongoDB-like API
   const d1Wrapper = {
@@ -8,96 +8,102 @@ export async function connectDB(env) {
       const self = this;
       
       return {
-        async find(filter = {}, options = {}) {
-          try {
-            let query = `SELECT * FROM ${name}`;
-            const params = [];
-            
-            // Build WHERE clause from filter
-            if (Object.keys(filter).length > 0) {
-              const conditions = [];
-              for (const [key, value] of Object.entries(filter)) {
-                if (typeof value === 'object' && value.$exists !== undefined) {
-                  // Handle $exists operator
-                  if (value.$exists) {
-                    conditions.push(`${key} IS NOT NULL AND ${key} != ''`);
-                  } else {
-                    conditions.push(`(${key} IS NULL OR ${key} = '')`);
+        find(filter = {}, options = {}) {
+          // Return an object that has toArray() and limit() methods
+          return {
+            async toArray() {
+              try {
+                let query = `SELECT * FROM ${name}`;
+                const params = [];
+                
+                // Build WHERE clause from filter
+                if (Object.keys(filter).length > 0) {
+                  const conditions = [];
+                  for (const [key, value] of Object.entries(filter)) {
+                    if (typeof value === 'object' && value.$exists !== undefined) {
+                      // Handle $exists operator
+                      if (value.$exists) {
+                        conditions.push(`${key} IS NOT NULL AND ${key} != ''`);
+                      } else {
+                        conditions.push(`(${key} IS NULL OR ${key} = '')`);
+                      }
+                    } else if (typeof value === 'object' && value.$regex) {
+                      // Handle regex search (case insensitive)
+                      conditions.push(`${key} LIKE ?`);
+                      params.push(`%${value.$regex}%`);
+                    } else {
+                      // Regular equality
+                      conditions.push(`${key} = ?`);
+                      params.push(value);
+                    }
                   }
-                } else if (typeof value === 'object' && value.$regex) {
-                  // Handle regex search (case insensitive)
-                  conditions.push(`${key} LIKE ?`);
-                  params.push(`%${value.$regex}%`);
-                } else {
-                  // Regular equality
-                  conditions.push(`${key} = ?`);
-                  params.push(value);
-                }
-              }
-              if (conditions.length > 0) {
-                query += ` WHERE ${conditions.join(' AND ')}`;
-              }
-            }
-            
-            // Add sorting
-            if (options.sort) {
-              const sortClauses = [];
-              for (const [field, direction] of Object.entries(options.sort)) {
-                sortClauses.push(`${field} ${direction === -1 ? 'DESC' : 'ASC'}`);
-              }
-              if (sortClauses.length > 0) {
-                query += ` ORDER BY ${sortClauses.join(', ')}`;
-              }
-            }
-            
-            // Add limit
-            if (options.limit) {
-              query += ` LIMIT ${options.limit}`;
-            }
-            
-            console.log('D1 Query:', query, 'Params:', params);
-            
-            const stmt = self.db.prepare(query);
-            const result = await (params.length > 0 ? stmt.bind(...params).all() : stmt.all());
-            
-            return {
-              toArray: async () => result.results.map(row => {
-                // Parse JSON fields
-                const parsed = { ...row, _id: row.id };
-                if (row.details) {
-                  try {
-                    parsed.details = JSON.parse(row.details);
-                  } catch (e) {
-                    console.warn('Failed to parse details JSON:', e);
+                  if (conditions.length > 0) {
+                    query += ` WHERE ${conditions.join(' AND ')}`;
                   }
                 }
-                if (row.file_info) {
-                  try {
-                    parsed.file_info = JSON.parse(row.file_info);
-                  } catch (e) {
-                    console.warn('Failed to parse file_info JSON:', e);
+                
+                // Add sorting
+                if (options.sort) {
+                  const sortClauses = [];
+                  for (const [field, direction] of Object.entries(options.sort)) {
+                    sortClauses.push(`${field} ${direction === -1 ? 'DESC' : 'ASC'}`);
+                  }
+                  if (sortClauses.length > 0) {
+                    query += ` ORDER BY ${sortClauses.join(', ')}`;
                   }
                 }
-                return parsed;
-              }),
-              limit: (count) => ({
-                toArray: async () => {
-                  const limitedQuery = query + ` LIMIT ${count}`;
-                  const stmt = self.db.prepare(limitedQuery);
-                  const result = await (params.length > 0 ? stmt.bind(...params).all() : stmt.all());
-                  return result.results.map(row => ({ ...row, _id: row.id }));
+                
+                // Add limit
+                if (options.limit) {
+                  query += ` LIMIT ${options.limit}`;
                 }
-              })
-            };
-          } catch (error) {
-            console.error('D1 find error:', error);
-            throw error;
-          }
+                
+                console.log('D1 Query:', query, 'Params:', params);
+                
+                const stmt = self.db.prepare(query);
+                const result = await (params.length > 0 ? stmt.bind(...params).all() : stmt.all());
+                
+                return result.results.map(row => {
+                  // Parse JSON fields
+                  const parsed = { ...row, _id: row.id };
+                  if (row.details) {
+                    try {
+                      parsed.details = JSON.parse(row.details);
+                    } catch (e) {
+                      console.warn('Failed to parse details JSON:', e);
+                    }
+                  }
+                  if (row.file_info) {
+                    try {
+                      parsed.file_info = JSON.parse(row.file_info);
+                    } catch (e) {
+                      console.warn('Failed to parse file_info JSON:', e);
+                    }
+                  }
+                  return parsed;
+                });
+              } catch (error) {
+                console.error('D1 find error:', error);
+                throw error;
+              }
+            },
+            
+            limit(count) {
+              // Return a new object with the limit applied
+              return {
+                async toArray() {
+                  const newOptions = { ...options, limit: count };
+                  const findResult = self.collection(name).find(filter, newOptions);
+                  return await findResult.toArray();
+                }
+              };
+            }
+          };
         },
         
         async findOne(filter) {
           try {
-            const result = await this.find(filter, { limit: 1 });
+            const result = this.find(filter, { limit: 1 });
             const results = await result.toArray();
             return results.length > 0 ? results[0] : null;
           } catch (error) {
