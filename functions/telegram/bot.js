@@ -359,11 +359,24 @@ export class Bot {
 
   async processFetch(chatId, language, type) {
     try {
-      const collection = type === 'movie' ? 'movies' : 'tv_shows';
-      const results = await this.db.collection(collection).find({
-        language: language,
-        file_id: { $exists: true }
-      }).toArray();
+      let results = [];
+
+      if (type === 'movie') {
+        // Movies store the file_id directly on the record
+        results = await this.db.collection('movies').find({
+          language: language,
+          file_id: { $exists: true }
+        }).toArray();
+      } else {
+        // TV shows store files in the episodes table – find shows that have episodes
+        const [shows, episodes] = await Promise.all([
+          this.db.collection('tv_shows').find({ language: language }).toArray(),
+          this.db.collection('episodes').find({ file_id: { $exists: true } }).toArray()
+        ]);
+
+        const showsWithEpisodes = new Set(episodes.map(ep => ep.show_id));
+        results = shows.filter(show => showsWithEpisodes.has(show.id));
+      }
 
       if (results.length === 0) {
         await this.sendMessage(chatId, `No ${type}s found in ${language}.`);
