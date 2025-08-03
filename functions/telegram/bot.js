@@ -420,7 +420,9 @@ export class Bot {
         await this.sendMessage(chatId, 'This movie has no file uploaded yet.');
       }
     } else {
-      const details = JSON.parse(selected.details || '{}');
+      const details = typeof selected.details === 'string'
+        ? JSON.parse(selected.details)
+        : (selected.details || {});
       const seasons = details.seasons || [];
       
       if (seasons.length === 0) {
@@ -461,7 +463,9 @@ export class Bot {
       }), { expirationTtl: 1800 });
 
     } else {
-      const details = JSON.parse(selected.details || '{}');
+      const details = typeof selected.details === 'string'
+        ? JSON.parse(selected.details)
+        : (selected.details || {});
       const seasons = details.seasons || [];
       
       if (seasons.length === 0) {

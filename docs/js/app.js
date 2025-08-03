@@ -467,6 +467,12 @@ class SparrowFlix {
     }
 
     navigate(section) {
+        // Clear live TV updates when leaving the Live TV section
+        if (section !== 'live' && this.channelInterval) {
+            clearInterval(this.channelInterval);
+            this.channelInterval = null;
+        }
+
         // Update active nav
         document.querySelectorAll('.nav-link').forEach(link => {
             link.classList.remove('active');
@@ -474,19 +480,19 @@ class SparrowFlix {
                 link.classList.add('active');
             }
         });
-        
+
         // Hide all sections
         document.querySelectorAll('.content-section').forEach(sec => {
             sec.style.display = 'none';
         });
-        
+
         // Show requested section
         switch (section) {
             case 'home':
                 const continueWatching = document.getElementById('continueWatching');
                 const moviesSection = document.getElementById('moviesSection');
                 const showsSection = document.getElementById('showsSection');
-                
+
                 if (continueWatching) continueWatching.style.display = 'block';
                 if (moviesSection) moviesSection.style.display = 'block';
                 if (showsSection) showsSection.style.display = 'block';
@@ -524,6 +530,69 @@ class SparrowFlix {
         } catch (error) {
             console.error('Failed to load channels:', error);
             this.showError('Failed to load live TV channels');
+        }
+    }
+
+    async updateChannels() {
+        try {
+            const response = await this.apiRequest('/channels/list');
+            this.renderChannels(response.channels);
+        } catch (error) {
+            console.error('Failed to update channels:', error);
+        }
+    }
+
+    async showChannelSchedule(channelId) {
+        try {
+            const response = await this.apiRequest(`/channels/schedule/${channelId}`);
+            const modal = document.getElementById('contentModal');
+            const modalBody = document.getElementById('modalBody');
+            if (!modal || !modalBody) return;
+
+            const schedule = response.schedule || [];
+            const scheduleHtml = schedule.map(program => `
+                <div class="schedule-item">
+                    <span class="schedule-time">${program.time}</span>
+                    <span class="schedule-title">${program.title}</span>
+                </div>
+            `).join('');
+
+            modalBody.innerHTML = `
+                <h3>${response.channel?.name || 'Channel'}</h3>
+                <div class="schedule-list">${scheduleHtml}</div>
+                <button id="watchLiveBtn" class="play-button">Watch Live</button>
+            `;
+
+            modal.style.display = 'block';
+
+            const watchBtn = document.getElementById('watchLiveBtn');
+            if (watchBtn) {
+                watchBtn.onclick = async () => {
+                    try {
+                        const streamResp = await this.apiRequest(`/channels/stream/${channelId}`);
+                        const { streamUrl } = streamResp;
+
+                        this.closeModal();
+
+                        const player = document.getElementById('videoPlayer');
+                        const video = document.getElementById('video');
+
+                        if (!player || !video) {
+                            throw new Error('Video player not found');
+                        }
+
+                        video.src = streamUrl;
+                        player.style.display = 'flex';
+                        video.play();
+                    } catch (err) {
+                        console.error('Failed to start live stream:', err);
+                        this.showError('Failed to start live stream: ' + err.message);
+                    }
+                };
+            }
+        } catch (error) {
+            console.error('Failed to load channel schedule:', error);
+            this.showError('Failed to load channel schedule');
         }
     }
 
