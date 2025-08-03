@@ -10,7 +10,10 @@ export async function handleTelegramWebhook(request, env) {
     const secret = request.headers.get('X-Telegram-Bot-Api-Secret-Token');
     if (env.WEBHOOK_SECRET && secret !== env.WEBHOOK_SECRET) {
       console.log('Invalid webhook secret:', secret);
-      return new Response('Unauthorized', { status: 401 });
+      return {
+        body: JSON.stringify({ error: 'Unauthorized' }),
+        status: 401
+      };
     }
 
     const update = await request.json();
@@ -31,22 +34,37 @@ export async function handleTelegramWebhook(request, env) {
     } catch (dbError) {
       console.error('Database connection failed:', dbError);
       // Still try to respond to user
-      await bot.sendMessage(
-        update.message?.chat?.id || update.callback_query?.from?.id,
-        '⚠️ Service temporarily unavailable. Please try again in a moment.'
-      );
-      return new Response('DB Error', { status: 500 });
+      if (update.message?.chat?.id || update.callback_query?.from?.id) {
+        const chatId = update.message?.chat?.id || update.callback_query?.from?.id;
+        await bot.sendMessage(
+          chatId,
+          '⚠️ Service temporarily unavailable. Please try again in a moment.'
+        );
+      }
+      return {
+        body: JSON.stringify({ error: 'Database connection failed' }),
+        status: 500
+      };
     }
 
     // Process the update
     await bot.handleUpdate(update);
 
-    return new Response('OK', { status: 200 });
+    return {
+      body: JSON.stringify({ ok: true }),
+      status: 200
+    };
   } catch (error) {
     console.error('Webhook error:', error);
     
-    // Always return 200 to stop Telegram retries for invalid updates
-    return new Response('Error logged', { status: 200 });
+    // Always return a proper response object
+    return {
+      body: JSON.stringify({ 
+        error: 'Webhook processing failed',
+        message: error.message 
+      }),
+      status: 500
+    };
   }
 }
 
