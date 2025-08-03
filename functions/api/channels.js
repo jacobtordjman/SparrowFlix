@@ -1,6 +1,8 @@
 // functions/api/channels.js
 
-export async function handleChannelsApi(request, db, params, user) {
+import { createTicket } from './ticket.js';
+
+export async function handleChannelsApi(request, db, params, user, env) {
     const [action, channelId] = params;
     
     switch (action) {
@@ -14,7 +16,7 @@ export async function handleChannelsApi(request, db, params, user) {
             return await getSchedule(db, channelId);
             
         case 'stream':
-            return await getChannelStream(db, channelId, user);
+            return await getChannelStream(db, channelId, user, env);
             
         default:
             return {
@@ -230,7 +232,7 @@ async function getSchedule(db, channelId) {
     };
 }
 
-async function getChannelStream(db, channelId, user) {
+async function getChannelStream(db, channelId, user, env) {
     const current = await getCurrentProgramForChannel(db, channelId);
     
     if (!current) {
@@ -242,7 +244,7 @@ async function getChannelStream(db, channelId, user) {
     }
     
     // Create a streaming ticket for the current program
-    const ticketData = {
+    const ticketInfo = await createTicket(env, {
         contentId: current.content_id,
         type: current.type,
         season: current.season,
@@ -250,14 +252,15 @@ async function getChannelStream(db, channelId, user) {
         channelId: channelId,
         startOffset: Math.round((current.progress / 100) * current.duration),
         userId: user?.id || 'guest',
-        expiresAt: new Date(current.end_time).getTime() + 300000, // 5 min buffer
-        createdAt: Date.now()
-    };
-    
+        expiresAt: new Date(current.end_time).getTime() + 300000 // 5 min buffer
+    });
+
     return {
         body: JSON.stringify({
             program: current,
-            streamData: ticketData
+            streamUrl: ticketInfo.streamUrl,
+            ticket: ticketInfo.ticketId,
+            expiresAt: ticketInfo.expiresAt
         }),
         status: 200,
         headers: { 'Content-Type': 'application/json' }
