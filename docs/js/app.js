@@ -56,6 +56,15 @@ class SparrowFlix {
                 this.navigate(e.target.getAttribute('href').substring(1));
             });
         });
+
+        // Hero CTA button
+        const startBtn = document.getElementById('startWatching');
+        if (startBtn) {
+            startBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                this.navigate('movies');
+            });
+        }
         
         // Modal close
         const closeBtn = document.querySelector('.close');
