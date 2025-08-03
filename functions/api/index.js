@@ -58,7 +58,7 @@ export async function handleApiRequest(request, env, path) {
       case 'channels':
         return await handleChannelsApi(request, db, params, user, env);
       
-      default
+      default:
         return {
           body: JSON.stringify({ error: 'Not found' }),
           status: 404,
@@ -352,70 +352,6 @@ async function handleWatchApi(request, db, params, user) {
   };
 }
 
-async function handleTicketApi(request, db, env, params, user) {
-  const [action] = params;
-
-  if (action === 'create' && request.method === 'POST') {
-    const { contentId, type, season, episode } = await request.json();
-
-    let fileId = null;
-    if (type === 'movie') {
-      const movie = await db.collection('movies').findOne({ id: contentId });
-      fileId = movie?.file_id;
-    } else if (type === 'show') {
-      const ep = await db.collection('episodes').findOne({
-        show_id: contentId,
-        season_number: Number(season),
-        episode_number: Number(episode)
-      });
-      fileId = ep?.file_id;
-    }
-
-    if (!fileId) {
-      return {
-        body: JSON.stringify({ error: 'Content not found' }),
-        status: 404,
-        headers: { 'Content-Type': 'application/json' }
-      };
-    }
-
-    // Generate unique ticket
-    const ticketId = generateTicketId();
-    const expiresAt = Date.now() + (6 * 60 * 60 * 1000); // 6 hours
-
-    const ticketData = {
-      contentId,
-      type,
-      season,
-      episode,
-      fileId,
-      userId: user?.id || 'guest',
-      expiresAt,
-      createdAt: Date.now()
-    };
-
-    // Store in KV
-    await env.TICKETS.put(ticketId, JSON.stringify(ticketData), {
-      expirationTtl: 6 * 60 * 60 // 6 hours in seconds
-    });
-
-    return {
-      body: JSON.stringify({
-        ticket: ticketId,
-        expiresAt,
-        streamUrl: `/stream/${ticketId}`
-      }),
-      status: 200,
-      headers: { 'Content-Type': 'application/json' }
-    };
-  }
-
-  return {
-    body: JSON.stringify({ error: 'Invalid request' }),
-    status: 400,
-    headers: { 'Content-Type': 'application/json' }
-  };
-}
 // Helper functions
 function formatMovie(movie) {
   return {
