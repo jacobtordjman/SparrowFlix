@@ -76,29 +76,86 @@ export async function handleApiRequest(request, env, path) {
   }
 }
 
-// Rest of your existing functions stay the same...
+// Updated handleContentApi function for functions/api/index.js
+
 async function handleContentApi(request, db, params, user) {
   const [type, id] = params;
   
   if (!type) {
     // Get all content - this should work without auth now
     try {
-      const movies = await db.collection('movies')
-        .find({ file_id: { $exists: true } })
-        .limit(50)
-        .toArray();
+      console.log('Fetching movies...');
       
-      const shows = await db.collection('tv_shows')
-        .find({ 'details.seasons.episodes.file_id': { $exists: true } })
-        .limit(50)
-        .toArray();
+      // For D1, let's be more explicit about the query
+      const moviesQuery = db.collection('movies').find({});
+      const allMovies = await moviesQuery.toArray();
       
-      console.log(`Found ${movies.length} movies and ${shows.length} shows`);
+      console.log(`Found ${allMovies.length} total movies`);
+      
+      // Filter movies that have files
+      const movies = allMovies.filter(movie => movie.file_id && movie.file_id.trim() !== '');
+      
+      console.log(`Found ${movies.length} movies with files`);
+      
+      console.log('Fetching TV shows...');
+      
+      const showsQuery = db.collection('tv_shows').find({});
+      const allShows = await showsQuery.toArray();
+      
+      console.log(`Found ${allShows.length} total shows`);
+      
+      // Get episodes for shows
+      const episodesQuery = db.collection('episodes').find({});
+      const allEpisodes = await episodesQuery.toArray();
+      
+      console.log(`Found ${allEpisodes.length} total episodes`);
+      
+      // Group episodes by show_id
+      const episodesByShow = {};
+      allEpisodes.forEach(episode => {
+        if (!episodesByShow[episode.show_id]) {
+          episodesByShow[episode.show_id] = [];
+        }
+        episodesByShow[episode.show_id].push(episode);
+      });
+      
+      // Filter shows that have episodes with files
+      const shows = allShows.filter(show => {
+        const episodes = episodesByShow[show.id] || [];
+        return episodes.some(ep => ep.file_id && ep.file_id.trim() !== '');
+      }).map(show => {
+        // Add episodes to show details if needed
+        const episodes = episodesByShow[show.id] || [];
+        const showWithEpisodes = { ...show };
+        
+        if (showWithEpisodes.details && typeof showWithEpisodes.details === 'object') {
+          // Organize episodes by season
+          const seasonMap = {};
+          episodes.forEach(ep => {
+            if (!seasonMap[ep.season_number]) {
+              seasonMap[ep.season_number] = [];
+            }
+            seasonMap[ep.season_number].push(ep);
+          });
+          
+          // Update seasons in details
+          if (showWithEpisodes.details.seasons) {
+            showWithEpisodes.details.seasons = showWithEpisodes.details.seasons.map(season => ({
+              ...season,
+              episodes: seasonMap[season.season_number] || []
+            }));
+          }
+        }
+        
+        return showWithEpisodes;
+      });
+      
+      console.log(`Found ${shows.length} shows with episodes`);
       
       return {
         body: JSON.stringify({
-          movies: movies.map(formatMovie),
-          shows: shows.map(formatTVShow)
+          movies: movies.slice(0, 50).map(formatMovie),
+          shows: shows.slice(0, 50).map(formatTVShow)
         }),
         status: 200,
         headers: { 'Content-Type': 'application/json' }
@@ -108,7 +165,8 @@ async function handleContentApi(request, db, params, user) {
       return {
         body: JSON.stringify({ 
           error: 'Failed to fetch content',
-          details: error.message 
+          details: error.message,
+          stack: error.stack
         }),
         status: 500,
         headers: { 'Content-Type': 'application/json' }
@@ -117,7 +175,7 @@ async function handleContentApi(request, db, params, user) {
   }
 
   if (type === 'movie' && id) {
-    const movie = await db.collection('movies').findOne({ _id: id });
+    const movie = await db.collection('movies').findOne({ id: id });
     if (!movie) {
       return {
         body: JSON.stringify({ error: 'Movie not found' }),
@@ -134,7 +192,7 @@ async function handleContentApi(request, db, params, user) {
   }
 
   if (type === 'show' && id) {
-    const show = await db.collection('tv_shows').findOne({ _id: id });
+    const show = await db.collection('tv_shows').findOne({ id: id });
     if (!show) {
       return {
         body: JSON.stringify({ error: 'Show not found' }),

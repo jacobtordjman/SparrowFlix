@@ -20,17 +20,19 @@ export async function connectDB(env) {
                 if (Object.keys(filter).length > 0) {
                   const conditions = [];
                   for (const [key, value] of Object.entries(filter)) {
-                    if (typeof value === 'object' && value.$exists !== undefined) {
-                      // Handle $exists operator
-                      if (value.$exists) {
-                        conditions.push(`${key} IS NOT NULL AND ${key} != ''`);
-                      } else {
-                        conditions.push(`(${key} IS NULL OR ${key} = '')`);
+                    if (typeof value === 'object' && value !== null) {
+                      if (value.$exists !== undefined) {
+                        // Handle $exists operator
+                        if (value.$exists) {
+                          conditions.push(`${key} IS NOT NULL AND ${key} != ''`);
+                        } else {
+                          conditions.push(`(${key} IS NULL OR ${key} = '')`);
+                        }
+                      } else if (value.$regex) {
+                        // Handle regex search (case insensitive)
+                        conditions.push(`${key} LIKE ?`);
+                        params.push(`%${value.$regex}%`);
                       }
-                    } else if (typeof value === 'object' && value.$regex) {
-                      // Handle regex search (case insensitive)
-                      conditions.push(`${key} LIKE ?`);
-                      params.push(`%${value.$regex}%`);
                     } else {
                       // Regular equality
                       conditions.push(`${key} = ?`);
@@ -63,23 +65,44 @@ export async function connectDB(env) {
                 const stmt = self.db.prepare(query);
                 const result = await (params.length > 0 ? stmt.bind(...params).all() : stmt.all());
                 
-                return result.results.map(row => {
-                  // Parse JSON fields
+                if (!result.success) {
+                  throw new Error(`D1 Query failed: ${result.error}`);
+                }
+                
+                return (result.results || []).map(row => {
+                  // Parse JSON fields and map _id
                   const parsed = { ...row, _id: row.id };
+                  
+                  // Parse details JSON field
                   if (row.details) {
                     try {
                       parsed.details = JSON.parse(row.details);
                     } catch (e) {
                       console.warn('Failed to parse details JSON:', e);
+                      parsed.details = null;
                     }
                   }
+                  
+                  // Parse file_info JSON field
                   if (row.file_info) {
                     try {
                       parsed.file_info = JSON.parse(row.file_info);
                     } catch (e) {
                       console.warn('Failed to parse file_info JSON:', e);
+                      parsed.file_info = null;
                     }
                   }
+                  
+                  // Parse preferences JSON field for users
+                  if (row.preferences) {
+                    try {
+                      parsed.preferences = JSON.parse(row.preferences);
+                    } catch (e) {
+                      console.warn('Failed to parse preferences JSON:', e);
+                      parsed.preferences = null;
+                    }
+                  }
+                  
                   return parsed;
                 });
               } catch (error) {
@@ -95,6 +118,27 @@ export async function connectDB(env) {
                   const newOptions = { ...options, limit: count };
                   const findResult = self.collection(name).find(filter, newOptions);
                   return await findResult.toArray();
+                }
+              };
+            },
+            
+            sort(sortOptions) {
+              // Return a new object with sorting applied
+              return {
+                async toArray() {
+                  const newOptions = { ...options, sort: sortOptions };
+                  const findResult = self.collection(name).find(filter, newOptions);
+                  return await findResult.toArray();
+                },
+                
+                limit(count) {
+                  return {
+                    async toArray() {
+                      const newOptions = { ...options, sort: sortOptions, limit: count };
+                      const findResult = self.collection(name).find(filter, newOptions);
+                      return await findResult.toArray();
+                    }
+                  };
                 }
               };
             }
@@ -120,15 +164,19 @@ export async function connectDB(env) {
             const insertId = id || _id || `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
             
             // Stringify JSON fields
+            const processedData = { ...data };
             if (data.details && typeof data.details === 'object') {
-              data.details = JSON.stringify(data.details);
+              processedData.details = JSON.stringify(data.details);
             }
             if (data.file_info && typeof data.file_info === 'object') {
-              data.file_info = JSON.stringify(data.file_info);
+              processedData.file_info = JSON.stringify(data.file_info);
+            }
+            if (data.preferences && typeof data.preferences === 'object') {
+              processedData.preferences = JSON.stringify(data.preferences);
             }
             
-            const fields = ['id', ...Object.keys(data)];
-            const values = [insertId, ...Object.values(data)];
+            const fields = ['id', ...Object.keys(processedData)];
+            const values = [insertId, ...Object.values(processedData)];
             const placeholders = fields.map(() => '?').join(', ');
             
             const query = `INSERT INTO ${name} (${fields.join(', ')}) VALUES (${placeholders})`;
@@ -136,6 +184,10 @@ export async function connectDB(env) {
             
             const stmt = self.db.prepare(query);
             const result = await stmt.bind(...values).run();
+            
+            if (!result.success) {
+              throw new Error(`D1 Insert failed: ${result.error}`);
+            }
             
             return { 
               insertedId: insertId,
@@ -152,15 +204,19 @@ export async function connectDB(env) {
             const updateData = update.$set || update;
             
             // Stringify JSON fields
+            const processedUpdateData = { ...updateData };
             if (updateData.details && typeof updateData.details === 'object') {
-              updateData.details = JSON.stringify(updateData.details);
+              processedUpdateData.details = JSON.stringify(updateData.details);
             }
             if (updateData.file_info && typeof updateData.file_info === 'object') {
-              updateData.file_info = JSON.stringify(updateData.file_info);
+              processedUpdateData.file_info = JSON.stringify(updateData.file_info);
+            }
+            if (updateData.preferences && typeof updateData.preferences === 'object') {
+              processedUpdateData.preferences = JSON.stringify(updateData.preferences);
             }
             
-            const setClauses = Object.keys(updateData).map(key => `${key} = ?`);
-            const setValues = Object.values(updateData);
+            const setClauses = Object.keys(processedUpdateData).map(key => `${key} = ?`);
+            const setValues = Object.values(processedUpdateData);
             
             // Build WHERE clause
             const whereConditions = [];
@@ -170,6 +226,10 @@ export async function connectDB(env) {
               whereValues.push(value);
             }
             
+            if (whereConditions.length === 0) {
+              throw new Error('Update requires WHERE clause');
+            }
+            
             const query = `UPDATE ${name} SET ${setClauses.join(', ')} WHERE ${whereConditions.join(' AND ')}`;
             const allValues = [...setValues, ...whereValues];
             
@@ -177,6 +237,10 @@ export async function connectDB(env) {
             
             const stmt = self.db.prepare(query);
             const result = await stmt.bind(...allValues).run();
+            
+            if (!result.success) {
+              throw new Error(`D1 Update failed: ${result.error}`);
+            }
             
             // Handle upsert
             if (options.upsert && result.changes === 0) {
@@ -202,11 +266,19 @@ export async function connectDB(env) {
               whereValues.push(value);
             }
             
+            if (whereConditions.length === 0) {
+              throw new Error('Delete requires WHERE clause');
+            }
+            
             const query = `DELETE FROM ${name} WHERE ${whereConditions.join(' AND ')}`;
             console.log('D1 Delete:', query, whereValues);
             
             const stmt = self.db.prepare(query);
             const result = await stmt.bind(...whereValues).run();
+            
+            if (!result.success) {
+              throw new Error(`D1 Delete failed: ${result.error}`);
+            }
             
             return { 
               deletedCount: result.changes,
