@@ -101,3 +101,8 @@ legacey/render.yaml
 *~
 *.orig
 .env
+.wrangler
+set_worker_secrets.sh
+d1_migration_guide.sh
+schema.sql
+set_worker_secrets.sh

@@ -61,6 +61,74 @@ export default {
         });
       }
 
+      // MongoDB debug endpoint
+      if (path === '/debug/mongodb' && env.DEV_NO_AUTH) {
+        try {
+          const testUrl = `https://data.mongodb-api.com/app/${env.MONGODB_APP_ID}/endpoint/data/v1/action/find`;
+          const testPayload = {
+            collection: 'movies',
+            database: env.MONGODB_DATABASE,
+            dataSource: env.MONGODB_DATA_SOURCE,
+            filter: {},
+            limit: 1
+          };
+
+          console.log('Testing MongoDB connection...');
+          console.log('URL:', testUrl);
+          console.log('Payload:', JSON.stringify(testPayload, null, 2));
+
+          const response = await fetch(testUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'api-key': env.MONGODB_API_KEY
+            },
+            body: JSON.stringify(testPayload)
+          });
+
+          const responseText = await response.text();
+          
+          return new Response(JSON.stringify({
+            mongodb_test: {
+              url: testUrl,
+              status: response.status,
+              statusText: response.statusText,
+              ok: response.ok,
+              headers: Object.fromEntries(response.headers.entries()),
+              response: responseText,
+              config: {
+                app_id: env.MONGODB_APP_ID,
+                data_source: env.MONGODB_DATA_SOURCE,
+                database: env.MONGODB_DATABASE,
+                api_key_length: env.MONGODB_API_KEY?.length || 0
+              }
+            }
+          }, null, 2), {
+            headers: {
+              'Content-Type': 'application/json',
+              ...corsHeaders,
+            },
+          });
+        } catch (error) {
+          return new Response(JSON.stringify({
+            mongodb_test_error: {
+              message: error.message,
+              stack: error.stack,
+              config: {
+                app_id: env.MONGODB_APP_ID,
+                data_source: env.MONGODB_DATA_SOURCE,
+                database: env.MONGODB_DATABASE
+              }
+            }
+          }, null, 2), {
+            headers: {
+              'Content-Type': 'application/json',
+              ...corsHeaders,
+            },
+          });
+        }
+      }
+
       // Simple test endpoint
       if (path === '/test') {
         return new Response(JSON.stringify({
@@ -77,11 +145,25 @@ export default {
       // Telegram webhook
       if (path === '/webhook' && request.method === 'POST') {
         console.log('Webhook request received');
-        const result = await handleTelegramWebhook(request, env);
-        return new Response(result.body || 'OK', {
-          status: result.status || 200,
-          headers: corsHeaders,
-        });
+        try {
+          const result = await handleTelegramWebhook(request, env);
+          return new Response(result.body || 'OK', {
+            status: result.status || 200,
+            headers: corsHeaders,
+          });
+        } catch (webhookError) {
+          console.error('Webhook Error:', webhookError);
+          return new Response(JSON.stringify({
+            error: 'Webhook failed',
+            message: webhookError.message
+          }), {
+            status: 500,
+            headers: {
+              'Content-Type': 'application/json',
+              ...corsHeaders,
+            },
+          });
+        }
       }
 
       // API routes

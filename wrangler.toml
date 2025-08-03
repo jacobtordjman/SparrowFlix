@@ -5,6 +5,11 @@ account_id         = "2eff6645caa146eee5d4b8bd40919aa7"
 compatibility_date = "2025-07-30"
 compatibility_flags= ["nodejs_compat"]
 
+[[d1_databases]]
+binding = "DB"
+database_name = "sparrowflix"
+database_id = "c78ac288-c09f-4e5b-8da4-065a4709659f"
+
 # ——— Production ENV ———
 [env.production]
 name   = "sparrowflix"
@@ -55,3 +60,8 @@ id      = "43ae63fc39714fc0b93fb7e1e14167a7"
 [[env.development.kv_namespaces]]
 binding = "TICKETS"
 id      = "69896c9e8dfa4fe79beabc6a7ddbee30"
+
+[[env.development.d1_databases]]
+binding = "DB"
+database_name = "sparrowflix"
+database_id = "c78ac288-c09f-4e5b-8da4-065a4709659f"
