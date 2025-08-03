@@ -2,7 +2,7 @@
 import { connectDB } from '../db/connection.js';
 import { verifyTelegramWebAppData } from '../utils/auth.js';
 import { handleChannelsApi } from './channels.js';
-import { createTicket } from './ticket.js';
+import { handleTicketApi } from './ticket.js';
 
 export async function handleApiRequest(request, env, path) {
   const db = await connectDB(env);
@@ -339,38 +339,6 @@ async function handleWatchApi(request, db, params, user) {
     
     return {
       body: JSON.stringify({ success: true }),
-      status: 200,
-      headers: { 'Content-Type': 'application/json' }
-    };
-  }
-
-  return {
-    body: JSON.stringify({ error: 'Invalid request' }),
-    status: 400,
-    headers: { 'Content-Type': 'application/json' }
-  };
-}
-
-async function handleTicketApi(request, env, params, user) {
-  const [action] = params;
-
-  if (action === 'create' && request.method === 'POST') {
-    const { contentId, type, season, episode } = await request.json();
-
-    const { ticketId, expiresAt, streamUrl } = await createTicket(env, {
-      contentId,
-      type,
-      season,
-      episode,
-      userId: user?.id || 'guest'
-    });
-
-    return {
-      body: JSON.stringify({
-        ticket: ticketId,
-        expiresAt,
-        streamUrl
-      }),
       status: 200,
       headers: { 'Content-Type': 'application/json' }
     };

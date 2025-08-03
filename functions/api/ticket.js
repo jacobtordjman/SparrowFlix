@@ -26,3 +26,35 @@ export async function createTicket(env, data) {
     streamUrl: `/stream/${ticketId}`
   };
 }
+
+export async function handleTicketApi(request, env, params, user) {
+  const [action] = params;
+
+  if (action === 'create' && request.method === 'POST') {
+    const { contentId, type, season, episode } = await request.json();
+
+    const { ticketId, expiresAt, streamUrl } = await createTicket(env, {
+      contentId,
+      type,
+      season,
+      episode,
+      userId: user?.id || 'guest'
+    });
+
+    return {
+      body: JSON.stringify({
+        ticket: ticketId,
+        expiresAt,
+        streamUrl
+      }),
+      status: 200,
+      headers: { 'Content-Type': 'application/json' }
+    };
+  }
+
+  return {
+    body: JSON.stringify({ error: 'Invalid request' }),
+    status: 400,
+    headers: { 'Content-Type': 'application/json' }
+  };
+}
