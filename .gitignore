@@ -106,3 +106,8 @@ set_worker_secrets.sh
 d1_migration_guide.sh
 schema.sql
 set_worker_secrets.sh
+migrate-mongodb-to-d1.js
+migrate.js
+migration_data_fixed.sql
+migration_data.sql
+migrate.js

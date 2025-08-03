@@ -1,4 +1,4 @@
-// functions/db/connection.js - D1 Database wrapper
+// functions/db/connection.js - D1 Database wrapper (REPLACE MongoDB version)
 export async function connectDB(env) {
   // D1 database wrapper to match MongoDB-like API
   const d1Wrapper = {
@@ -79,6 +79,14 @@ export async function connectDB(env) {
                   }
                 }
                 return parsed;
+              }),
+              limit: (count) => ({
+                toArray: async () => {
+                  const limitedQuery = query + ` LIMIT ${count}`;
+                  const stmt = self.db.prepare(limitedQuery);
+                  const result = await (params.length > 0 ? stmt.bind(...params).all() : stmt.all());
+                  return result.results.map(row => ({ ...row, _id: row.id }));
+                }
               })
             };
           } catch (error) {

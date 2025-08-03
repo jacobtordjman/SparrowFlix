@@ -1,8 +1,9 @@
-// SparrowFlix Web App
+// SparrowFlix Web App - Updated for Cloudflare Workers
 class SparrowFlix {
     constructor() {
-        this.tg = window.Telegram.WebApp;
-        this.apiUrl = window.SPARROWFLIX_API_URL || `${window.location.origin}/api`;
+        this.tg = window.Telegram?.WebApp;
+        // Point to your Cloudflare Workers API
+        this.apiUrl = 'https://sparrowflix-dev.sparrowflix.workers.dev/api';
         this.content = { movies: [], shows: [] };
         this.watchHistory = [];
         this.currentUser = null;
@@ -11,19 +12,21 @@ class SparrowFlix {
     }
 
     async init() {
-        // Initialize Telegram Web App
-        this.tg.ready();
-        this.tg.expand();
-        
-        // Set theme
-        if (this.tg.colorScheme === 'dark') {
-            document.body.classList.add('dark');
-        }
-        
-        // Get auth data
-        const initData = this.tg.initData;
-        if (initData) {
-            localStorage.setItem('tg-auth', initData);
+        // Initialize Telegram Web App if available
+        if (this.tg) {
+            this.tg.ready();
+            this.tg.expand();
+            
+            // Set theme
+            if (this.tg.colorScheme === 'dark') {
+                document.body.classList.add('dark');
+            }
+            
+            // Get auth data
+            const initData = this.tg.initData;
+            if (initData) {
+                localStorage.setItem('tg-auth', initData);
+            }
         }
         
         // Load content
@@ -55,14 +58,20 @@ class SparrowFlix {
         });
         
         // Modal close
-        document.querySelector('.close').addEventListener('click', () => {
-            this.closeModal();
-        });
+        const closeBtn = document.querySelector('.close');
+        if (closeBtn) {
+            closeBtn.addEventListener('click', () => {
+                this.closeModal();
+            });
+        }
         
         // Video player close
-        document.getElementById('closePlayer').addEventListener('click', () => {
-            this.closePlayer();
-        });
+        const closePlayerBtn = document.getElementById('closePlayer');
+        if (closePlayerBtn) {
+            closePlayerBtn.addEventListener('click', () => {
+                this.closePlayer();
+            });
+        }
         
         // Click outside modal
         window.addEventListener('click', (e) => {
@@ -86,32 +95,48 @@ class SparrowFlix {
 
     async loadContent() {
         try {
+            console.log('Loading content from API:', this.apiUrl);
             const response = await this.apiRequest('/content');
             this.content = response;
             
-            this.renderMovies(response.movies);
-            this.renderShows(response.shows);
+            console.log('Content loaded:', this.content);
+            this.renderMovies(response.movies || []);
+            this.renderShows(response.shows || []);
         } catch (error) {
             console.error('Failed to load content:', error);
-            this.showError('Failed to load content');
+            this.showError('Failed to load content: ' + error.message);
         }
     }
 
     async loadUserData() {
         try {
+            // Only load user data if we have Telegram auth
+            if (!this.tg || !localStorage.getItem('tg-auth')) {
+                console.log('No Telegram auth, skipping user data');
+                return;
+            }
+            
             const response = await this.apiRequest('/user');
             this.currentUser = response.user;
-            this.watchHistory = response.watchHistory;
+            this.watchHistory = response.watchHistory || [];
             
             this.renderContinueWatching();
         } catch (error) {
             console.error('Failed to load user data:', error);
+            // Don't show error for user data, as it's optional
         }
     }
 
     renderMovies(movies) {
         const container = document.getElementById('moviesRow');
+        if (!container) return;
+        
         container.innerHTML = '';
+        
+        if (movies.length === 0) {
+            container.innerHTML = '<div class="loading">No movies available</div>';
+            return;
+        }
         
         movies.forEach(movie => {
             const card = this.createContentCard(movie, 'movie');
@@ -121,7 +146,14 @@ class SparrowFlix {
 
     renderShows(shows) {
         const container = document.getElementById('showsRow');
+        if (!container) return;
+        
         container.innerHTML = '';
+        
+        if (shows.length === 0) {
+            container.innerHTML = '<div class="loading">No TV shows available</div>';
+            return;
+        }
         
         shows.forEach(show => {
             const card = this.createContentCard(show, 'show');
@@ -134,6 +166,8 @@ class SparrowFlix {
         
         const section = document.getElementById('continueWatching');
         const container = document.getElementById('continueWatchingRow');
+        
+        if (!section || !container) return;
         
         section.style.display = 'block';
         container.innerHTML = '';
@@ -204,6 +238,8 @@ class SparrowFlix {
     async showContentDetails(content, type) {
         const modal = document.getElementById('contentModal');
         const modalBody = document.getElementById('modalBody');
+        
+        if (!modal || !modalBody) return;
         
         const backdropUrl = content.backdropPath
             ? `https://image.tmdb.org/t/p/original${content.backdropPath}`
@@ -284,7 +320,10 @@ class SparrowFlix {
         const season = show.seasons.find(s => s.seasonNumber === seasonNumber);
         
         // Update episode list
-        document.getElementById('episodeList').innerHTML = this.renderEpisodes(showId, season);
+        const episodeList = document.getElementById('episodeList');
+        if (episodeList) {
+            episodeList.innerHTML = this.renderEpisodes(showId, season);
+        }
     }
 
     async playContent(contentId, type, season = null, episode = null) {
@@ -309,6 +348,10 @@ class SparrowFlix {
             const player = document.getElementById('videoPlayer');
             const video = document.getElementById('video');
             
+            if (!player || !video) {
+                throw new Error('Video player not found');
+            }
+            
             video.src = streamUrl;
             player.style.display = 'flex';
             
@@ -320,7 +363,7 @@ class SparrowFlix {
             
         } catch (error) {
             console.error('Playback failed:', error);
-            this.showError('Failed to start playback');
+            this.showError('Failed to start playback: ' + error.message);
         }
     }
 
@@ -353,7 +396,10 @@ class SparrowFlix {
 
     async search(query) {
         if (!query) {
-            document.getElementById('searchResults').style.display = 'none';
+            const searchResults = document.getElementById('searchResults');
+            if (searchResults) {
+                searchResults.style.display = 'none';
+            }
             return;
         }
         
@@ -368,6 +414,8 @@ class SparrowFlix {
     renderSearchResults(results) {
         const section = document.getElementById('searchResults');
         const container = document.getElementById('searchResultsRow');
+        
+        if (!section || !container) return;
         
         if (results.length === 0) {
             section.style.display = 'none';
@@ -384,16 +432,24 @@ class SparrowFlix {
     }
 
     closeModal() {
-        document.getElementById('contentModal').style.display = 'none';
+        const modal = document.getElementById('contentModal');
+        if (modal) {
+            modal.style.display = 'none';
+        }
     }
 
     closePlayer() {
         const player = document.getElementById('videoPlayer');
         const video = document.getElementById('video');
         
-        video.pause();
-        video.src = '';
-        player.style.display = 'none';
+        if (video) {
+            video.pause();
+            video.src = '';
+        }
+        
+        if (player) {
+            player.style.display = 'none';
+        }
     }
 
     findContent(id, type) {
@@ -418,19 +474,28 @@ class SparrowFlix {
         // Show requested section
         switch (section) {
             case 'home':
-                document.getElementById('continueWatching').style.display = 'block';
-                document.getElementById('moviesSection').style.display = 'block';
-                document.getElementById('showsSection').style.display = 'block';
+                const continueWatching = document.getElementById('continueWatching');
+                const moviesSection = document.getElementById('moviesSection');
+                const showsSection = document.getElementById('showsSection');
+                
+                if (continueWatching) continueWatching.style.display = 'block';
+                if (moviesSection) moviesSection.style.display = 'block';
+                if (showsSection) showsSection.style.display = 'block';
                 break;
             case 'movies':
-                document.getElementById('moviesSection').style.display = 'block';
+                const movies = document.getElementById('moviesSection');
+                if (movies) movies.style.display = 'block';
                 break;
             case 'shows':
-                document.getElementById('showsSection').style.display = 'block';
+                const shows = document.getElementById('showsSection');
+                if (shows) shows.style.display = 'block';
                 break;
             case 'live':
-                document.getElementById('liveTVSection').style.display = 'block';
-                this.loadLiveTV();
+                const liveTV = document.getElementById('liveTVSection');
+                if (liveTV) {
+                    liveTV.style.display = 'block';
+                    this.loadLiveTV();
+                }
                 break;
         }
     }
@@ -455,6 +520,8 @@ class SparrowFlix {
 
     renderChannels(channels) {
         const container = document.getElementById('channelsGrid');
+        if (!container) return;
+        
         container.innerHTML = '';
         
         channels.forEach(channel => {
@@ -491,121 +558,21 @@ class SparrowFlix {
         });
     }
 
-    async updateChannels() {
-        // Silently update channel info without re-rendering
-        try {
-            const response = await this.apiRequest('/channels/list');
-            response.channels.forEach(channel => {
-                const card = document.querySelector(`[data-channel-id="${channel.id}"]`);
-                if (card && channel.currentProgram) {
-                    const progressBar = card.querySelector('.program-progress-bar');
-                    if (progressBar) {
-                        progressBar.style.width = `${channel.currentProgram.progress}%`;
-                    }
-                }
-            });
-        } catch (error) {
-            console.error('Failed to update channels:', error);
+    formatTime(seconds) {
+        const hours = Math.floor(seconds / 3600);
+        const minutes = Math.floor((seconds % 3600) / 60);
+        if (hours > 0) {
+            return `${hours}h ${minutes}m`;
         }
-    }
-
-    async showChannelSchedule(channelId) {
-        try {
-            const response = await this.apiRequest(`/channels/schedule/${channelId}`);
-            const { channel, schedule } = response;
-            
-            const modal = document.getElementById('contentModal');
-            const modalBody = document.getElementById('modalBody');
-            
-            modalBody.innerHTML = `
-                <div class="modal-info">
-                    <h2 class="modal-title">${channel.name}</h2>
-                    <p class="modal-meta">${channel.description}</p>
-                    
-                    <button class="play-button" onclick="app.watchChannel('${channelId}')">
-                        ▶ Watch Live
-                    </button>
-                    
-                    <h3 style="margin-top: 2rem; margin-bottom: 1rem;">Schedule</h3>
-                    <div class="schedule-list">
-                        ${schedule.map(item => {
-                            const startTime = new Date(item.start_time);
-                            const isNow = startTime <= new Date() && new Date(item.end_time) > new Date();
-                            
-                            return `
-                                <div class="schedule-item ${isNow ? 'schedule-current' : ''}">
-                                    <div class="schedule-time">
-                                        ${startTime.toLocaleTimeString([], { 
-                                            hour: '2-digit', 
-                                            minute: '2-digit' 
-                                        })}
-                                    </div>
-                                    <div class="schedule-content">
-                                        <div class="schedule-title">${item.title}</div>
-                                        <div class="schedule-duration">
-                                            ${Math.round(item.duration / 60)} min
-                                        </div>
-                                    </div>
-                                </div>
-                            `;
-                        }).join('')}
-                    </div>
-                </div>
-            `;
-            
-            modal.style.display = 'block';
-        } catch (error) {
-            console.error('Failed to load schedule:', error);
-            this.showError('Failed to load channel schedule');
-        }
-    }
-
-    async watchChannel(channelId) {
-        try {
-            const response = await this.apiRequest(`/channels/stream/${channelId}`);
-            const { program, streamData } = response;
-            
-            // Create a special ticket for live TV
-            const ticketResponse = await this.apiRequest('/ticket/create', {
-                method: 'POST',
-                body: JSON.stringify({
-                    ...streamData,
-                    isLive: true
-                })
-            });
-            
-            const { streamUrl } = ticketResponse;
-            
-            // Open video player
-            const player = document.getElementById('videoPlayer');
-            const video = document.getElementById('video');
-            
-            video.src = streamUrl;
-            player.style.display = 'flex';
-            
-            // Start playback
-            video.play();
-            
-            // Track progress
-            this.trackProgress(video, program.content_id, program.content_type, program.season, program.episode);
-            
-        } catch (error) {
-            console.error('Failed to watch channel:', error);
-            this.showError('Failed to start live stream');
-        }
+        return `${minutes}m`;
     }
 
     showError(message) {
-        // Show error using Telegram's native popup
-        if (this.tg.showPopup) {
-            this.tg.showPopup({
-                title: 'Error',
-                message: message,
-                buttons: [{ type: 'ok' }]
-            });
-        } else {
-            alert(message);
-        }
+        // Show error using browser alert for now
+        alert(message);
+        
+        // Also log to console
+        console.error('SparrowFlix Error:', message);
     }
 
     async apiRequest(endpoint, options = {}) {
@@ -614,19 +581,26 @@ class SparrowFlix {
             ...options.headers
         };
 
-        // Add Telegram auth data
+        // Add Telegram auth data if available
         const authData = localStorage.getItem('tg-auth');
         if (authData) {
             headers['X-Telegram-Init-Data'] = authData;
         }
 
-        const response = await fetch(`${this.apiUrl}${endpoint}`, {
+        const url = `${this.apiUrl}${endpoint}`;
+        console.log('API Request:', url);
+
+        const response = await fetch(url, {
             ...options,
             headers
         });
 
+        console.log('API Response:', response.status, response.statusText);
+
         if (!response.ok) {
-            throw new Error(`API request failed: ${response.status}`);
+            const errorText = await response.text();
+            console.error('API Error:', errorText);
+            throw new Error(`API request failed: ${response.status} - ${errorText}`);
         }
 
         return await response.json();

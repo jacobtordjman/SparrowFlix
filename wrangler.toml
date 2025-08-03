@@ -5,11 +5,6 @@ account_id         = "2eff6645caa146eee5d4b8bd40919aa7"
 compatibility_date = "2025-07-30"
 compatibility_flags= ["nodejs_compat"]
 
-[[d1_databases]]
-binding = "DB"
-database_name = "sparrowflix"
-database_id = "c78ac288-c09f-4e5b-8da4-065a4709659f"
-
 # ——— Production ENV ———
 [env.production]
 name   = "sparrowflix"
@@ -22,12 +17,11 @@ MONGODB_DATABASE = "sparrowflix"
 BOT_USERNAME = "sparrowflix_bot"
 MINI_APP_URL = "https://t.me/sparrowflix_bot/app"
 
-# Secrets (set with: wrangler secret put SECRET_NAME)
-# BOT_TOKEN = "your-bot-token"
-# MONGODB_API_KEY = "your-mongodb-api-key" 
-# STORAGE_CHANNEL_ID = "your-channel-id"
-# TMDB_API_KEY = "your-tmdb-api-key"
-# WEBHOOK_SECRET = "your-webhook-secret"
+# D1 Database for production
+[[env.production.d1_databases]]
+binding = "DB"
+database_name = "sparrowflix"
+database_id = "547873e5-704c-4629-a5aa-03d5c965fc91"
 
 # KV namespaces for production
 [[env.production.kv_namespaces]]
@@ -52,6 +46,12 @@ BOT_USERNAME = "sparrowflix_bot"
 MINI_APP_URL = "https://t.me/sparrowflix_bot/app"
 DEV_NO_AUTH = "true"
 
+# D1 Database for development
+[[env.development.d1_databases]]
+binding = "DB"
+database_name = "sparrowflix"
+database_id = "547873e5-704c-4629-a5aa-03d5c965fc91"
+
 # KV namespaces for development
 [[env.development.kv_namespaces]]
 binding = "FILEPATH_CACHE"
@@ -60,8 +60,3 @@ id      = "43ae63fc39714fc0b93fb7e1e14167a7"
 [[env.development.kv_namespaces]]
 binding = "TICKETS"
 id      = "69896c9e8dfa4fe79beabc6a7ddbee30"
-
-[[env.development.d1_databases]]
-binding = "DB"
-database_name = "sparrowflix"
-database_id = "c78ac288-c09f-4e5b-8da4-065a4709659f"
