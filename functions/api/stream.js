@@ -36,10 +36,31 @@ async function getTelegramFileUrl(env, botToken, fileId) {
 
 export async function handleStreamRequest(request, env) {
   const url = new URL(request.url);
-  const fileId = url.pathname.split('/').pop();
+  const ticketId = url.pathname.split('/').pop();
 
+  if (!ticketId) {
+    return new Response('Ticket ID required', { status: 400 });
+  }
+
+  const stored = await env.TICKETS.get(ticketId);
+  if (!stored) {
+    return new Response('Ticket not found', { status: 404 });
+  }
+
+  let ticket;
+  try {
+    ticket = JSON.parse(stored);
+  } catch (e) {
+    return new Response('Invalid ticket', { status: 400 });
+  }
+
+  if (Date.now() > ticket.expiresAt) {
+    return new Response('Ticket expired', { status: 410 });
+  }
+
+  const fileId = ticket.fileId;
   if (!fileId) {
-    return new Response('File ID required', { status: 400 });
+    return new Response('File not available', { status: 404 });
   }
 
   const fileUrl = await getTelegramFileUrl(env, env.BOT_TOKEN, fileId);
