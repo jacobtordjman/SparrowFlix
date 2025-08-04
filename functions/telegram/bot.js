@@ -30,6 +30,13 @@ export class Bot {
 
     console.log(`Received message: ${text} from chat: ${chatId}`);
 
+    // Master stop command - always takes precedence
+    if (text === '/stop') {
+      await this.env.FILEPATH_CACHE.delete(`state_${chatId}`);
+      await this.sendMessage(chatId, 'Bot stopped. Send /start to begin again.');
+      return;
+    }
+
     // First check if user is in a state-based flow
     const handled = await this.handleStateBasedMessage(message);
     if (handled) return;
