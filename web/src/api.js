@@ -13,3 +13,8 @@ export async function apiRequest(endpoint, options = {}) {
 }
 
 export const getContent = () => apiRequest('/content');
+export const createTicket = (data) =>
+  apiRequest('/ticket/create', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
