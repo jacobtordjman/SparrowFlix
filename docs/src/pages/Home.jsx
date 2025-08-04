@@ -1,21 +1,18 @@
-import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { getContent } from '../api.js';
+import React from 'react';
+import useContent from '../hooks/useContent.js';
+import Hero from '../components/Hero.jsx';
+import ContentRow from '../components/ContentRow.jsx';
 
 export default function Home() {
-  const [movies, setMovies] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-
-  useEffect(() => {
-    getContent()
-      .then((data) => setMovies(data.movies || []))
-      .catch((err) => setError(err.message))
-      .finally(() => setLoading(false));
-  }, []);
+  const { featured, rows, movies, loading, error } = useContent();
 
   if (loading) {
-    return <div className="p-4">Loading...</div>;
+    return (
+      <div className="p-2 space-y-6 pb-16">
+        <div className="h-64 bg-gray-800 animate-pulse rounded" />
+        <div className="h-48 bg-gray-800 animate-pulse rounded" />
+      </div>
+    );
   }
 
   if (error) {
@@ -23,18 +20,15 @@ export default function Home() {
   }
 
   return (
-    <section className="p-8">
-      <h1 className="text-2xl font-bold mb-4">Featured</h1>
-      <div className="flex overflow-x-auto space-x-4 pb-4">
-        {movies.map((m) => (
-          <Link key={m.id} to={`/watch/${m.id}`} className="flex-none w-40">
-            <img
-              src={m.poster}
-              alt={m.title}
-              className="rounded hover:scale-105 transition-transform" />
-          </Link>
-        ))}
-      </div>
-    </section>
+    <div className="p-2 pb-16">
+      <Hero movie={featured} />
+      {rows.map(({ title, items }) => (
+        <ContentRow
+          key={title}
+          title={title}
+          items={items.length ? items : movies}
+        />
+      ))}
+    </div>
   );
 }

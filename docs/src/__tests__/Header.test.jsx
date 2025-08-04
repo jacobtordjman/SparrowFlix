@@ -1,16 +1,15 @@
 import React from 'react';
 import { BrowserRouter } from 'react-router-dom';
-import { createRoot } from 'react-dom/client';
+import { render, screen } from '@testing-library/react';
+import '@testing-library/jest-dom';
 import { test, expect } from 'vitest';
 import Header from '../components/Header.jsx';
 
 test('renders brand name', () => {
-  const container = document.createElement('div');
-  const root = createRoot(container);
-  root.render(
+  render(
     <BrowserRouter>
       <Header />
     </BrowserRouter>
   );
-  expect(container.textContent).toContain('SparrowFlix');
+  expect(screen.getByText('SparrowFlix')).toBeInTheDocument();
 });
