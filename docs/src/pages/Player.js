@@ -16,21 +16,19 @@ export default function Player() {
   }, [id]);
 
   if (error) {
-    return <div className="p-4 text-red-500">{error}</div>;
+    return React.createElement('div', { className: 'p-4 text-red-500' }, error);
   }
 
-  return (
-    <section className="p-4">
-      {streamUrl ? (
-        <video
-          controls
-          autoPlay
-          className="w-full max-w-screen-md mx-auto"
-          src={streamUrl}
-        />
-      ) : (
-        <div>Loading...</div>
-      )}
-    </section>
+  return React.createElement(
+    'section',
+    { className: 'p-4' },
+    streamUrl
+      ? React.createElement('video', {
+          controls: true,
+          autoPlay: true,
+          className: 'w-full max-w-screen-md mx-auto',
+          src: streamUrl,
+        })
+      : React.createElement('div', null, 'Loading...')
   );
 }
