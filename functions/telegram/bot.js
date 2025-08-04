@@ -760,13 +760,22 @@ export class Bot {
       ...options
     };
 
-    const response = await fetch(`${this.apiUrl}/sendMessage`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
-    });
+    try {
+      const response = await fetch(`${this.apiUrl}/sendMessage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
 
-    return await response.json();
+      const data = await response.json();
+      if (!response.ok || !data.ok) {
+        console.error('Telegram sendMessage error:', data);
+      }
+      return data;
+    } catch (error) {
+      console.error('Telegram sendMessage network error:', error);
+      throw error;
+    }
   }
 
   async sendDocument(chatId, fileId) {
@@ -775,13 +784,22 @@ export class Bot {
       document: fileId
     };
 
-    const response = await fetch(`${this.apiUrl}/sendDocument`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
-    });
+    try {
+      const response = await fetch(`${this.apiUrl}/sendDocument`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
 
-    return await response.json();
+      const data = await response.json();
+      if (!response.ok || !data.ok) {
+        console.error('Telegram sendDocument error:', data);
+      }
+      return data;
+    } catch (error) {
+      console.error('Telegram sendDocument network error:', error);
+      throw error;
+    }
   }
 
   async forwardMessage(toChatId, fromChatId, messageId) {
@@ -791,13 +809,22 @@ export class Bot {
       message_id: messageId
     };
 
-    const response = await fetch(`${this.apiUrl}/forwardMessage`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
-    });
+    try {
+      const response = await fetch(`${this.apiUrl}/forwardMessage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
 
-    return await response.json();
+      const data = await response.json();
+      if (!response.ok || !data.ok) {
+        console.error('Telegram forwardMessage error:', data);
+      }
+      return data;
+    } catch (error) {
+      console.error('Telegram forwardMessage network error:', error);
+      throw error;
+    }
   }
 
   async answerCallbackQuery(callbackQueryId, text = null) {
