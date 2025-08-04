@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
-import { verifyTelegramWebAppData } from '../functions/utils/auth.js';
+import { verifyTelegramWebAppData, hashPassword, verifyPassword } from '../functions/utils/auth.js';
+import { generateWebToken, verifyWebToken } from '../functions/utils/jwt.js';
 
 test('verifyTelegramWebAppData returns user for valid hash', () => {
   const botToken = 'test_token';
@@ -49,5 +50,19 @@ test('verifyTelegramWebAppData returns null for invalid hash', () => {
   const initData = params.toString();
   const result = verifyTelegramWebAppData(initData, botToken);
   assert.strictEqual(result, null);
+});
+
+test('hashPassword and verifyPassword work together', () => {
+  const password = 'secret';
+  const hashed = hashPassword(password);
+  assert.ok(hashed.includes(':'));
+  assert.equal(verifyPassword(password, hashed), true);
+});
+
+test('generateWebToken creates verifiable token', () => {
+  const secret = 'testsecret';
+  const token = generateWebToken({ id: 1 }, secret, 60);
+  const payload = verifyWebToken(token, secret);
+  assert.equal(payload.id, 1);
 });
 

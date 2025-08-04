@@ -1,7 +1,7 @@
 // functions/api/index.js - Updated with proper auth handling
 import { connectDB } from '../db/connection.js';
-import { verifyTelegramWebAppData } from '../utils/auth.js';
-import { verifyWebToken } from '../utils/jwt.js';
+import { verifyTelegramWebAppData, hashPassword, verifyPassword } from '../utils/auth.js';
+import { verifyWebToken, generateWebToken } from '../utils/jwt.js';
 import { handleChannelsApi } from './channels.js';
 import { handleTicketApi } from './ticket.js';
 
@@ -20,6 +20,7 @@ export async function handleApiRequest(request, env, path) {
   // Verify Telegram authentication only for protected routes
   const authHeader = request.headers.get('X-Telegram-Init-Data');
   const bearerHeader = request.headers.get('Authorization');
+  const cookieHeader = request.headers.get('Cookie');
   let user = null;
 
   if (authHeader) {
@@ -34,6 +35,21 @@ export async function handleApiRequest(request, env, path) {
   } else if (bearerHeader) {
     const token = bearerHeader.replace('Bearer ', '');
     user = verifyWebToken(token, env.JWT_SECRET);
+    if (!user && requiresAuth) {
+      return {
+        body: JSON.stringify({ error: 'Unauthorized' }),
+        status: 401,
+        headers: { 'Content-Type': 'application/json' }
+      };
+    }
+  } else if (cookieHeader) {
+    const cookies = Object.fromEntries(cookieHeader.split(';').map(c => {
+      const [k, v] = c.trim().split('=');
+      return [k, v];
+    }));
+    if (cookies.session) {
+      user = verifyWebToken(cookies.session, env.JWT_SECRET);
+    }
     if (!user && requiresAuth) {
       return {
         body: JSON.stringify({ error: 'Unauthorized' }),
@@ -69,7 +85,13 @@ export async function handleApiRequest(request, env, path) {
 
       case 'channels':
         return await handleChannelsApi(request, db, params, user, env);
-      
+
+      case 'login':
+        return await handleLoginApi(request, db, env);
+
+      case 'register':
+        return await handleRegisterApi(request, db, env);
+
       default:
         return {
           body: JSON.stringify({ error: 'Not found' }),
@@ -284,29 +306,32 @@ async function handleUserApi(request, db, user) {
     };
   }
 
-  // Get or create user
-  const userData = await db.collection('users').findOneAndUpdate(
-    { telegram_id: user.id },
-    {
-      $set: {
-        username: user.username,
+  const filter = user.first_name ? { telegram_id: user.id } : { id: user.id };
+  const update = {
+    $set: {
+      username: user.username,
+      ...(user.first_name ? {
         first_name: user.first_name,
         last_name: user.last_name,
-        last_seen: new Date()
-      },
-      $setOnInsert: {
-        created_at: new Date(),
-        preferences: {
-          language: 'english',
-          autoplay: true,
-          quality: 'auto'
-        }
-      }
+      } : {}),
+      last_seen: new Date(),
     },
+    $setOnInsert: {
+      created_at: new Date(),
+      preferences: {
+        language: 'english',
+        autoplay: true,
+        quality: 'auto'
+      }
+    }
+  };
+
+  const userData = await db.collection('users').findOneAndUpdate(
+    filter,
+    update,
     { upsert: true, returnDocument: 'after' }
   );
 
-  // Get watch history
   const watchHistory = await db.collection('watch_history')
     .find({ user_id: user.id })
     .sort({ last_watched: -1 })
@@ -361,6 +386,77 @@ async function handleWatchApi(request, db, params, user) {
     body: JSON.stringify({ error: 'Invalid request' }),
     status: 400,
     headers: { 'Content-Type': 'application/json' }
+  };
+}
+
+async function handleRegisterApi(request, db, env) {
+  const { username, password, oauthToken } = await request.json();
+
+  if (!username || (!password && !oauthToken)) {
+    return {
+      body: JSON.stringify({ error: 'Invalid request' }),
+      status: 400,
+      headers: { 'Content-Type': 'application/json' }
+    };
+  }
+
+  const existing = await db.collection('users').findOne({ username });
+  if (existing) {
+    return {
+      body: JSON.stringify({ error: 'User exists' }),
+      status: 409,
+      headers: { 'Content-Type': 'application/json' }
+    };
+  }
+
+  const userData = { username, created_at: new Date() };
+  if (password) {
+    userData.password = hashPassword(password);
+  }
+  if (oauthToken) {
+    userData.oauth_token = oauthToken;
+  }
+
+  const result = await db.collection('users').insertOne(userData);
+  const token = generateWebToken({ id: result.insertedId, username }, env.JWT_SECRET);
+  return {
+    body: JSON.stringify({ token }),
+    status: 200,
+    headers: {
+      'Content-Type': 'application/json',
+      'Set-Cookie': `session=${token}; HttpOnly; Path=/; Max-Age=604800`
+    }
+  };
+}
+
+async function handleLoginApi(request, db, env) {
+  const { username, password } = await request.json();
+
+  if (!username || !password) {
+    return {
+      body: JSON.stringify({ error: 'Invalid request' }),
+      status: 400,
+      headers: { 'Content-Type': 'application/json' }
+    };
+  }
+
+  const user = await db.collection('users').findOne({ username });
+  if (!user || !user.password || !verifyPassword(password, user.password)) {
+    return {
+      body: JSON.stringify({ error: 'Invalid credentials' }),
+      status: 401,
+      headers: { 'Content-Type': 'application/json' }
+    };
+  }
+
+  const token = generateWebToken({ id: user.id || user._id, username }, env.JWT_SECRET);
+  return {
+    body: JSON.stringify({ token }),
+    status: 200,
+    headers: {
+      'Content-Type': 'application/json',
+      'Set-Cookie': `session=${token}; HttpOnly; Path=/; Max-Age=604800`
+    }
   };
 }
 
