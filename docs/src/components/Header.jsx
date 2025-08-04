@@ -5,7 +5,7 @@ export default function Header() {
   const [open, setOpen] = useState(false);
 
   const linkClass = ({ isActive }) =>
-    `px-3 py-2 ${isActive ? 'text-red-500 font-semibold' : 'text-gray-300'}`;
+    `block px-3 py-2 ${isActive ? 'text-red-500 font-semibold' : 'text-gray-300'}`;
 
   return (
     <header className="bg-black shadow-md sticky top-0 z-10">
@@ -15,24 +15,32 @@ export default function Header() {
         </NavLink>
         <button
           className="text-white md:hidden"
+          aria-label="Toggle navigation"
+          aria-expanded={open}
+          aria-controls="nav-menu"
           onClick={() => setOpen((o) => !o)}
         >
           ☰
         </button>
-        <div
+        <ul
+          id="nav-menu"
           className={`${open ? 'block' : 'hidden'} md:flex md:space-x-4 space-y-2 md:space-y-0`}
         >
-          <NavLink to="/" className={linkClass} onClick={() => setOpen(false)}>
-            Home
-          </NavLink>
-          <NavLink
-            to="/movies"
-            className={linkClass}
-            onClick={() => setOpen(false)}
-          >
-            Movies
-          </NavLink>
-        </div>
+          <li>
+            <NavLink to="/" end className={linkClass} onClick={() => setOpen(false)}>
+              Home
+            </NavLink>
+          </li>
+          <li>
+            <NavLink
+              to="/movies"
+              className={linkClass}
+              onClick={() => setOpen(false)}
+            >
+              Movies
+            </NavLink>
+          </li>
+        </ul>
       </nav>
     </header>
   );
