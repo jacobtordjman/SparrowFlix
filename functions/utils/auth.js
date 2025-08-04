@@ -1,6 +1,22 @@
 // functions/utils/auth.js
 import crypto from 'crypto';
 
+export function hashPassword(password) {
+  const salt = crypto.randomBytes(16).toString('hex');
+  const hash = crypto
+    .pbkdf2Sync(password, salt, 1000, 64, 'sha512')
+    .toString('hex');
+  return `${salt}:${hash}`;
+}
+
+export function verifyPassword(password, stored) {
+  const [salt, originalHash] = stored.split(':');
+  const hash = crypto
+    .pbkdf2Sync(password, salt, 1000, 64, 'sha512')
+    .toString('hex');
+  return hash === originalHash;
+}
+
 export function verifyTelegramWebAppData(initData, botToken) {
   try {
     const urlParams = new URLSearchParams(initData);
