@@ -4,6 +4,7 @@ class SparrowFlix {
         this.tg = window.Telegram?.WebApp;
         // Point to your Cloudflare Workers API
         this.apiUrl = 'https://sparrowflix-dev.sparrowflix.workers.dev/api';
+        this.webToken = null;
         this.content = { movies: [], shows: [] };
         this.watchHistory = [];
         this.currentUser = null;
@@ -16,17 +17,27 @@ class SparrowFlix {
         if (this.tg) {
             this.tg.ready();
             this.tg.expand();
-            
+
             // Set theme
             if (this.tg.colorScheme === 'dark') {
                 document.body.classList.add('dark');
             }
-            
+
             // Get auth data
             const initData = this.tg.initData;
             if (initData) {
                 localStorage.setItem('tg-auth', initData);
             }
+        }
+
+        // Capture web token from URL or localStorage
+        const params = new URLSearchParams(window.location.search);
+        const token = params.get('token');
+        if (token) {
+            localStorage.setItem('web-token', token);
+            this.webToken = token;
+        } else {
+            this.webToken = localStorage.getItem('web-token');
         }
         
         // Load content
@@ -663,6 +674,12 @@ class SparrowFlix {
         const authData = localStorage.getItem('tg-auth');
         if (authData) {
             headers['X-Telegram-Init-Data'] = authData;
+        }
+
+        // Add web token if present
+        const token = this.webToken || localStorage.getItem('web-token');
+        if (token) {
+            headers['Authorization'] = `Bearer ${token}`;
         }
 
         const url = `${this.apiUrl}${endpoint}`;
