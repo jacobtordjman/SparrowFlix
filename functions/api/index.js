@@ -1,6 +1,7 @@
 // functions/api/index.js - Updated with proper auth handling
 import { connectDB } from '../db/connection.js';
 import { verifyTelegramWebAppData } from '../utils/auth.js';
+import { verifyWebToken } from '../utils/jwt.js';
 import { handleChannelsApi } from './channels.js';
 import { handleTicketApi } from './ticket.js';
 
@@ -13,15 +14,26 @@ export async function handleApiRequest(request, env, path) {
   const [resource, ...params] = apiPath.split('/');
 
   // Define which routes require authentication
-  const protectedRoutes = ['user', 'watch', 'ticket'];
+  const protectedRoutes = ['user', 'watch'];
   const requiresAuth = protectedRoutes.includes(resource);
 
   // Verify Telegram authentication only for protected routes
   const authHeader = request.headers.get('X-Telegram-Init-Data');
+  const bearerHeader = request.headers.get('Authorization');
   let user = null;
-  
+
   if (authHeader) {
     user = verifyTelegramWebAppData(authHeader, env.BOT_TOKEN);
+    if (!user && requiresAuth) {
+      return {
+        body: JSON.stringify({ error: 'Unauthorized' }),
+        status: 401,
+        headers: { 'Content-Type': 'application/json' }
+      };
+    }
+  } else if (bearerHeader) {
+    const token = bearerHeader.replace('Bearer ', '');
+    user = verifyWebToken(token, env.JWT_SECRET);
     if (!user && requiresAuth) {
       return {
         body: JSON.stringify({ error: 'Unauthorized' }),
