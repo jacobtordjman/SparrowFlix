@@ -26,14 +26,24 @@ export class Bot {
 
   async handleMessage(message) {
     const chatId = message.chat.id;
-    const text = message.text;
+    const text = message.text || '';
 
     console.log(`Received message: ${text} from chat: ${chatId}`);
 
-    // Master stop command - always takes precedence
-    if (text === '/stop') {
+    const statusKey = `bot_status_${chatId}`;
+    const isActive = (await this.env.FILEPATH_CACHE.get(statusKey)) !== 'stopped';
+
+    // Global stop command
+    if (text.startsWith('/stop')) {
+      await this.env.FILEPATH_CACHE.put(statusKey, 'stopped', { expirationTtl: 86400 });
       await this.env.FILEPATH_CACHE.delete(`state_${chatId}`);
       await this.sendMessage(chatId, 'Bot stopped. Send /start to begin again.');
+      return;
+    }
+
+    // If bot is stopped, only respond to /start
+    if (!isActive && !text.startsWith('/start')) {
+      await this.sendMessage(chatId, 'Bot is currently stopped. Send /start to begin.');
       return;
     }
 
@@ -42,8 +52,12 @@ export class Bot {
     if (handled) return;
 
     // Handle commands and main menu options
-    if (text === '/start') {
+    if (text.startsWith('/start')) {
+      await this.env.FILEPATH_CACHE.put(statusKey, 'active', { expirationTtl: 86400 });
+      await this.env.FILEPATH_CACHE.delete(`state_${chatId}`);
       await this.sendMainMenu(chatId);
+    } else if (text.startsWith('/status')) {
+      await this.sendMessage(chatId, isActive ? 'Bot is running.' : 'Bot is stopped.');
     } else if (text === '/app' || text === '/stream') {
       await this.sendMiniApp(chatId);
     } else if (text === 'Add New Title') {
