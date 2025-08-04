@@ -7,7 +7,12 @@ export default function Home() {
   const { featured, rows, movies, loading, error } = useContent();
 
   if (loading) {
-    return <div className="p-4">Loading...</div>;
+    return (
+      <div className="p-2 space-y-6 pb-16">
+        <div className="h-64 bg-gray-800 animate-pulse rounded" />
+        <div className="h-48 bg-gray-800 animate-pulse rounded" />
+      </div>
+    );
   }
 
   if (error) {
@@ -15,7 +20,7 @@ export default function Home() {
   }
 
   return (
-    <div className="p-2">
+    <div className="p-2 pb-16">
       <Hero movie={featured} />
       {rows.map(({ title, items }) => (
         <ContentRow
