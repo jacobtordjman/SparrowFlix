@@ -1,18 +1,10 @@
-import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { getContent } from '../api.js';
+import React from 'react';
+import useContent from '../hooks/useContent.js';
+import Hero from '../components/Hero.jsx';
+import ContentRow from '../components/ContentRow.jsx';
 
 export default function Home() {
-  const [movies, setMovies] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-
-  useEffect(() => {
-    getContent()
-      .then((data) => setMovies(data.movies || []))
-      .catch((err) => setError(err.message))
-      .finally(() => setLoading(false));
-  }, []);
+  const { movies, loading, error } = useContent();
 
   if (loading) {
     return <div className="p-4">Loading...</div>;
@@ -22,19 +14,17 @@ export default function Home() {
     return <div className="p-4 text-red-500">{error}</div>;
   }
 
+  const [featured, ...rest] = movies;
+  const trending = rest.slice(0, 10);
+  const newReleases = rest.slice(10, 20);
+  const classics = rest.slice(20, 30);
+
   return (
-    <section className="p-8">
-      <h1 className="text-2xl font-bold mb-4">Featured</h1>
-      <div className="flex overflow-x-auto space-x-4 pb-4">
-        {movies.map((m) => (
-          <Link key={m.id} to={`/watch/${m.id}`} className="flex-none w-40">
-            <img
-              src={m.poster}
-              alt={m.title}
-              className="rounded hover:scale-105 transition-transform" />
-          </Link>
-        ))}
-      </div>
-    </section>
+    <div className="p-2">
+      <Hero movie={featured} />
+      <ContentRow title="Trending Now" items={trending.length ? trending : movies} />
+      <ContentRow title="New Releases" items={newReleases.length ? newReleases : movies} />
+      <ContentRow title="Classics" items={classics.length ? classics : movies} />
+    </div>
   );
 }
