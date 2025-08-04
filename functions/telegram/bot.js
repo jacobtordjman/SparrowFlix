@@ -38,6 +38,14 @@ export class Bot {
       await this.env.FILEPATH_CACHE.put(statusKey, 'stopped', { expirationTtl: 86400 });
       await this.env.FILEPATH_CACHE.delete(`state_${chatId}`);
       await this.sendMessage(chatId, 'Bot stopped. Send /start to begin again.');
+      console.log(`Stop command received from chat ${chatId}`);
+      if (typeof process !== 'undefined' && typeof process.exit === 'function') {
+        console.log('Exiting process due to /stop command');
+        // Allow the message above to be sent before terminating
+        setTimeout(() => process.exit(0), 0);
+      } else {
+        console.log('Process exit not supported in this environment');
+      }
       return;
     }
 
@@ -55,6 +63,7 @@ export class Bot {
     if (text.startsWith('/start')) {
       await this.env.FILEPATH_CACHE.put(statusKey, 'active', { expirationTtl: 86400 });
       await this.env.FILEPATH_CACHE.delete(`state_${chatId}`);
+      console.log(`Start command received from chat ${chatId}`);
       await this.sendMainMenu(chatId);
     } else if (text.startsWith('/status')) {
       await this.sendMessage(chatId, isActive ? 'Bot is running.' : 'Bot is stopped.');
