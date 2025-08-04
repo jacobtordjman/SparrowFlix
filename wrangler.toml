@@ -17,6 +17,7 @@ MONGODB_DATABASE = "sparrowflix"
 BOT_USERNAME = "sparrowflix_bot"
 MINI_APP_URL = "https://t.me/sparrowflix_bot/app"
 DEV_NO_AUTH = "true"
+BOT_TOKEN = "your-telegram-bot-token"
 
 [[env.development.d1_databases]]
 binding = "DB"
@@ -41,6 +42,7 @@ MONGODB_DATA_SOURCE = "Cluster0"
 MONGODB_DATABASE = "sparrowflix"
 BOT_USERNAME = "sparrowflix_bot"
 MINI_APP_URL = "https://t.me/sparrowflix_bot/app"
+BOT_TOKEN = "your-telegram-bot-token"
 
 [[env.production.d1_databases]]
 binding = "DB"
