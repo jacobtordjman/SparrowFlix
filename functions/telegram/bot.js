@@ -26,14 +26,24 @@ export class Bot {
 
   async handleMessage(message) {
     const chatId = message.chat.id;
-    const text = message.text;
+    const text = message.text || '';
 
     console.log(`Received message: ${text} from chat: ${chatId}`);
 
-    // Master stop command - always takes precedence
-    if (text === '/stop') {
+    const statusKey = `bot_status_${chatId}`;
+    const isActive = (await this.env.FILEPATH_CACHE.get(statusKey)) !== 'stopped';
+
+    // Global stop command
+    if (text.startsWith('/stop')) {
+      await this.env.FILEPATH_CACHE.put(statusKey, 'stopped', { expirationTtl: 86400 });
       await this.env.FILEPATH_CACHE.delete(`state_${chatId}`);
       await this.sendMessage(chatId, 'Bot stopped. Send /start to begin again.');
+      return;
+    }
+
+    // If bot is stopped, only respond to /start
+    if (!isActive && !text.startsWith('/start')) {
+      await this.sendMessage(chatId, 'Bot is currently stopped. Send /start to begin.');
       return;
     }
 
@@ -42,8 +52,12 @@ export class Bot {
     if (handled) return;
 
     // Handle commands and main menu options
-    if (text === '/start') {
+    if (text.startsWith('/start')) {
+      await this.env.FILEPATH_CACHE.put(statusKey, 'active', { expirationTtl: 86400 });
+      await this.env.FILEPATH_CACHE.delete(`state_${chatId}`);
       await this.sendMainMenu(chatId);
+    } else if (text.startsWith('/status')) {
+      await this.sendMessage(chatId, isActive ? 'Bot is running.' : 'Bot is stopped.');
     } else if (text === '/app' || text === '/stream') {
       await this.sendMiniApp(chatId);
     } else if (text === 'Add New Title') {
@@ -175,6 +189,8 @@ export class Bot {
           return await this.handleTitleSelection(chatId, text, action, context);
         case 'season_selection':
           return await this.handleSeasonSelection(chatId, text, action, context);
+        case 'episode_selection':
+          return await this.handleEpisodeSelection(chatId, text, action, context);
         default:
           return false;
       }
@@ -420,7 +436,10 @@ export class Bot {
 
   async processFetchTitle(chatId, selected, context) {
     if (context.type === 'movie') {
-      if (selected.file_id) {
+      if (selected.storage_channel_id && selected.storage_message_id) {
+        await this.sendMessage(chatId, `🎬 ${selected.title}`);
+        await this.forwardMessage(chatId, selected.storage_channel_id, selected.storage_message_id);
+      } else if (selected.file_id) {
         await this.sendMessage(chatId, `🎬 ${selected.title}`);
         await this.sendDocument(chatId, selected.file_id);
       } else {
@@ -522,6 +541,8 @@ export class Bot {
           type: 'tv',
           season: seasonNumber
         }), { expirationTtl: 1800 });
+        await this.env.FILEPATH_CACHE.delete(`state_${chatId}`);
+        return true;
 
       } else if (action === 'fetch') {
         const episodes = await this.db.collection('episodes').find({
@@ -545,9 +566,18 @@ export class Bot {
         };
 
         await this.sendMessage(chatId, 'Select an episode:', { reply_markup: keyboard });
+
+        await this.env.FILEPATH_CACHE.put(`state_${chatId}`, JSON.stringify({
+          step: 'episode_selection',
+          action: 'fetch',
+          selected_show: context.selected_show,
+          season: seasonNumber,
+          episodes
+        }), { expirationTtl: 300 });
+
+        return true;
       }
 
-      await this.env.FILEPATH_CACHE.delete(`state_${chatId}`);
       return true;
 
     } catch (error) {
@@ -555,6 +585,32 @@ export class Bot {
       await this.sendMessage(chatId, 'Season selection failed. Please try again.');
       return true;
     }
+  }
+
+  async handleEpisodeSelection(chatId, episodeText, action, context) {
+    const match = episodeText.match(/Episode (\d+)/);
+    if (!match) {
+      await this.sendMessage(chatId, 'Invalid episode format.');
+      return true;
+    }
+
+    const episodeNum = parseInt(match[1]);
+    const episode = context.episodes.find(ep => ep.episode_number === episodeNum);
+
+    if (!episode) {
+      await this.sendMessage(chatId, 'Episode not found.');
+      return true;
+    }
+
+    if (episode.storage_channel_id && episode.storage_message_id) {
+      await this.forwardMessage(chatId, episode.storage_channel_id, episode.storage_message_id);
+    } else if (episode.file_id) {
+      await this.sendDocument(chatId, episode.file_id);
+    } else {
+      await this.sendMessage(chatId, 'No file available for this episode.');
+    }
+
+    return true;
   }
 
   async handleBack(chatId, currentStep, action, context) {
