@@ -9,7 +9,7 @@
     "deploy": "wrangler deploy",
     "tail": "wrangler tail",
     "test": "node --test tests",
-    "lint": "eslint functions docs/js"
+    "lint": "eslint functions docs/src"
   },
   "dependencies": {
     "dotenv": "^16.0.3",

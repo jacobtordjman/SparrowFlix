@@ -1,94 +1,13 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Stream your personal collection anywhere with SparrowFlix">
-    <title>SparrowFlix - Your Personal Streaming Service</title>
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/style.css">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SparrowFlix</title>
+  <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body>
-    <div id="app">
-        <!-- Header -->
-        <header class="header">
-            <div class="header-content">
-                <h1 class="logo">🎬 SparrowFlix</h1>
-                <nav class="nav">
-                    <a href="#home" class="nav-link active">Home</a>
-                    <a href="#movies" class="nav-link">Movies</a>
-                    <a href="#shows" class="nav-link">TV Shows</a>
-                    <a href="#live" class="nav-link">Live TV</a>
-                </nav>
-                <div class="search-container">
-                    <input type="text" id="searchInput" placeholder="Search..." class="search-input">
-                </div>
-            </div>
-        </header>
-
-        <!-- Hero Section -->
-        <section id="hero" class="hero">
-            <div class="hero-content">
-                <h2 class="hero-title">Welcome to Your Personal Cinema</h2>
-                <p class="hero-subtitle">Stream your collection anywhere, anytime</p>
-                <a href="#movies" id="startWatching" class="cta-button">Start Watching</a>
-            </div>
-        </section>
-
-        <!-- Continue Watching -->
-        <section id="continueWatching" class="content-section" style="display: none;">
-            <h2 class="section-title">Continue Watching</h2>
-            <div class="content-row" id="continueWatchingRow"></div>
-        </section>
-
-        <!-- Movies Section -->
-        <section id="moviesSection" class="content-section">
-            <h2 class="section-title">Movies</h2>
-            <div class="content-row" id="moviesRow">
-                <div class="loading">Loading movies...</div>
-            </div>
-        </section>
-
-        <!-- TV Shows Section -->
-        <section id="showsSection" class="content-section">
-            <h2 class="section-title">TV Shows</h2>
-            <div class="content-row" id="showsRow">
-                <div class="loading">Loading shows...</div>
-            </div>
-        </section>
-
-        <!-- Search Results -->
-        <section id="searchResults" class="content-section" style="display: none;">
-            <h2 class="section-title">Search Results</h2>
-            <div class="content-row" id="searchResultsRow"></div>
-        </section>
-
-        <!-- Live TV Section -->
-        <section id="liveTVSection" class="content-section" style="display: none;">
-            <h2 class="section-title">Live TV Channels</h2>
-            <div class="channels-grid" id="channelsGrid">
-                <div class="loading">Loading channels...</div>
-            </div>
-        </section>
-
-        <!-- Content Modal -->
-        <div id="contentModal" class="modal">
-            <div class="modal-content">
-                <span class="close">&times;</span>
-                <div id="modalBody"></div>
-            </div>
-        </div>
-
-        <!-- Video Player -->
-        <div id="videoPlayer" class="video-player" style="display: none;">
-            <video id="video" controls></video>
-            <button id="closePlayer" class="close-player">✕</button>
-        </div>
-    </div>
-
-    <script src="js/app.js"></script>
+<body class="font-sans">
+  <div id="root"></div>
+  <script type="module" src="./src/main.jsx"></script>
 </body>
 </html>
