@@ -56,3 +56,30 @@ test('start and stop commands manage process and state', async () => {
 
   process.exit = originalExit;
 });
+
+test('sendMessage logs API errors', async () => {
+  const cache = new MockCache();
+  const env = { FILEPATH_CACHE: cache };
+  const bot = new Bot('token', env);
+
+  const originalFetch = global.fetch;
+  global.fetch = async () => ({
+    ok: false,
+    json: async () => ({ ok: false, description: 'unauthorized' }),
+  });
+
+  let logged;
+  const originalError = console.error;
+  console.error = (msg, data) => {
+    if (msg === 'Telegram sendMessage error:') {
+      logged = data;
+    }
+  };
+
+  await bot.sendMessage(1, 'hi');
+
+  assert.deepEqual(logged, { ok: false, description: 'unauthorized' });
+
+  console.error = originalError;
+  global.fetch = originalFetch;
+});
