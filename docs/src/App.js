@@ -1,5 +1,5 @@
 import React from 'https://esm.sh/react@18';
-import { BrowserRouter, Routes, Route } from 'https://esm.sh/react-router-dom@6';
+import { BrowserRouter, Routes, Route } from 'https://esm.sh/react-router-dom@6?deps=react@18,react-dom@18';
 import Header from './components/Header.js';
 import Home from './pages/Home.js';
 import Movies from './pages/Movies.js';

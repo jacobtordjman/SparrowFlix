@@ -1,5 +1,5 @@
 import React from 'https://esm.sh/react@18';
-import { Link, useLocation } from 'https://esm.sh/react-router-dom@6';
+import { Link, useLocation } from 'https://esm.sh/react-router-dom@6?deps=react@18,react-dom@18';
 
 export default function Header() {
   const location = useLocation();
