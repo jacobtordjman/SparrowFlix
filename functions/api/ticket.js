@@ -1,4 +1,5 @@
 // functions/api/ticket.js
+import { connectDB } from '../db/connection.js';
 
 export function generateTicketId() {
   return Array.from(crypto.getRandomValues(new Uint8Array(16)))
@@ -6,11 +7,27 @@ export function generateTicketId() {
     .join('');
 }
 
-export async function createTicket(env, data) {
+export async function createTicket(env, data, dbOverride = null) {
+  const db = dbOverride || (await connectDB(env));
+  let fileId;
+
+  if (data.type === 'movie') {
+    const movie = await db.collection('movies').findOne({ id: data.contentId });
+    fileId = movie?.file_id;
+  } else if (data.type === 'show') {
+    const episodeDoc = await db.collection('episodes').findOne({
+      show_id: data.contentId,
+      season_number: data.season,
+      episode_number: data.episode
+    });
+    fileId = episodeDoc?.file_id;
+  }
+
   const ticketId = generateTicketId();
   const expiresAt = data.expiresAt || (Date.now() + 6 * 60 * 60 * 1000);
   const ticketData = {
     ...data,
+    fileId,
     expiresAt,
     createdAt: Date.now()
   };
