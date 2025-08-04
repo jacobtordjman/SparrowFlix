@@ -1,43 +1,15 @@
-# ─ top-level (for default env if you ever publish without --env)
-name               = "sparrowflix"
-main               = "functions/index.js"
-account_id         = "2eff6645caa146eee5d4b8bd40919aa7"
+# Default configuration
+name = "sparrowflix"
+main = "functions/index.js"
+account_id = "2eff6645caa146eee5d4b8bd40919aa7"
 compatibility_date = "2025-07-30"
-compatibility_flags= ["nodejs_compat"]
+compatibility_flags = ["nodejs_compat"]
 
-# ——— Production ENV ———
-[env.production]
-name   = "sparrowflix"
-
-# Environment variables for production
-[env.production.vars]
-MONGODB_APP_ID = "sparrowflixapi-lyutpvp"
-MONGODB_DATA_SOURCE = "Cluster0"
-MONGODB_DATABASE = "sparrowflix"
-BOT_USERNAME = "sparrowflix_bot"
-MINI_APP_URL = "https://t.me/sparrowflix_bot/app"
-
-# D1 Database for production
-[[env.production.d1_databases]]
-binding = "DB"
-database_name = "sparrowflix"
-database_id = "547873e5-704c-4629-a5aa-03d5c965fc91"
-
-# KV namespaces for production
-[[env.production.kv_namespaces]]
-binding = "FILEPATH_CACHE"
-id      = "43ae63fc39714fc0b93fb7e1e14167a7"
-
-[[env.production.kv_namespaces]]
-binding = "TICKETS"
-id      = "69896c9e8dfa4fe79beabc6a7ddbee30"
-
-# ——— Development ENV ———
+# Development environment
 [env.development]
-name        = "sparrowflix-dev"
+name = "sparrowflix-dev"
 workers_dev = true
 
-# Environment variables for development
 [env.development.vars]
 MONGODB_APP_ID = "sparrowflixapi-lyutpvp"
 MONGODB_DATA_SOURCE = "Cluster0"
@@ -46,17 +18,39 @@ BOT_USERNAME = "sparrowflix_bot"
 MINI_APP_URL = "https://t.me/sparrowflix_bot/app"
 DEV_NO_AUTH = "true"
 
-# D1 Database for development
 [[env.development.d1_databases]]
 binding = "DB"
 database_name = "sparrowflix"
 database_id = "547873e5-704c-4629-a5aa-03d5c965fc91"
 
-# KV namespaces for development
 [[env.development.kv_namespaces]]
 binding = "FILEPATH_CACHE"
-id      = "43ae63fc39714fc0b93fb7e1e14167a7"
+id = "43ae63fc39714fc0b93fb7e1e14167a7"
 
 [[env.development.kv_namespaces]]
 binding = "TICKETS"
-id      = "69896c9e8dfa4fe79beabc6a7ddbee30"
+id = "69896c9e8dfa4fe79beabc6a7ddbee30"
+
+# Production environment
+[env.production]
+name = "sparrowflix"
+
+[env.production.vars]
+MONGODB_APP_ID = "sparrowflixapi-lyutpvp"
+MONGODB_DATA_SOURCE = "Cluster0"
+MONGODB_DATABASE = "sparrowflix"
+BOT_USERNAME = "sparrowflix_bot"
+MINI_APP_URL = "https://t.me/sparrowflix_bot/app"
+
+[[env.production.d1_databases]]
+binding = "DB"
+database_name = "sparrowflix"
+database_id = "547873e5-704c-4629-a5aa-03d5c965fc91"
+
+[[env.production.kv_namespaces]]
+binding = "FILEPATH_CACHE"
+id = "43ae63fc39714fc0b93fb7e1e14167a7"
+
+[[env.production.kv_namespaces]]
+binding = "TICKETS"
+id = "69896c9e8dfa4fe79beabc6a7ddbee30"
