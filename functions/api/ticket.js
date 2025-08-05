@@ -1,5 +1,4 @@
-// functions/api/ticket.js
-import { connectDB } from '../db/connection.js';
+// functions/api/ticket.js - uses direct D1 queries
 
 export function generateTicketId() {
   return Array.from(crypto.getRandomValues(new Uint8Array(16)))
@@ -8,19 +7,17 @@ export function generateTicketId() {
 }
 
 export async function createTicket(env, data, dbOverride = null) {
-  const db = dbOverride || (await connectDB(env));
+  const db = dbOverride || env.DB;
   let fileId;
 
   if (data.type === 'movie') {
-    const movie = await db.collection('movies').findOne({ id: data.contentId });
-    fileId = movie?.file_id;
+    const stmt = db.prepare('SELECT file_id FROM movies WHERE id = ?');
+    fileId = await stmt.bind(data.contentId).first('file_id');
   } else if (data.type === 'show') {
-    const episodeDoc = await db.collection('episodes').findOne({
-      show_id: data.contentId,
-      season_number: data.season,
-      episode_number: data.episode
-    });
-    fileId = episodeDoc?.file_id;
+    const stmt = db.prepare(
+      'SELECT file_id FROM episodes WHERE show_id = ? AND season_number = ? AND episode_number = ?'
+    );
+    fileId = await stmt.bind(data.contentId, data.season, data.episode).first('file_id');
   }
 
   const ticketId = generateTicketId();

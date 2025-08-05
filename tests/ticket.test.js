@@ -6,13 +6,18 @@ import { createTicket } from '../functions/api/ticket.js';
 
 test('createTicket stores fileId in ticket data', async () => {
   const fakeDB = {
-    collection: () => ({
-      findOne: async () => ({ file_id: 'file123' })
+    prepare: () => ({
+      bind: () => ({
+        async first() {
+          return 'file123';
+        }
+      })
     })
   };
 
   let stored;
   const env = {
+    DB: fakeDB,
     TICKETS: {
       async put(key, value) {
         stored = JSON.parse(value);
@@ -20,7 +25,7 @@ test('createTicket stores fileId in ticket data', async () => {
     }
   };
 
-  await createTicket(env, { contentId: '1', type: 'movie' }, fakeDB);
+  await createTicket(env, { contentId: '1', type: 'movie' });
 
   assert.strictEqual(stored.fileId, 'file123');
 });
