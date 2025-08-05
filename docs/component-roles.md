@@ -18,6 +18,10 @@
   - Store original files as backup
   - Provide file IDs for initial processing
 - **Migration Plan**: Move to a free-tier CDN or self-hosted object store when possible
+- **Should NOT**:
+  - Serve content directly to users
+  - Store user data or authentication details
+  - Act as a long-term CDN
 
 ## Web App
 - **Primary Role**: User-facing streaming platform
@@ -26,3 +30,7 @@
   - Video playback
   - User profiles & preferences
   - Social features (ratings, lists)
+- **Should NOT**:
+  - Manage content ingestion or uploads
+  - Store original backup files
+  - Depend on Telegram-specific features
