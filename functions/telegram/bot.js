@@ -67,16 +67,16 @@ export class Bot {
       await this.sendMainMenu(chatId);
     } else if (text.startsWith('/status')) {
       await this.sendMessage(chatId, isActive ? 'Bot is running.' : 'Bot is stopped.');
-    } else if (text === '/app' || text === '/stream') {
-      await this.sendMiniApp(chatId);
-    } else if (text === 'Add New Title') {
-      await this.handleAddTitle(chatId);
-    } else if (text === 'Upload') {
+    } else if (text === '/add_movie') {
+      await this.handleAddMovie(chatId);
+    } else if (text === '/add_show') {
+      await this.handleAddShow(chatId);
+    } else if (text === '/upload') {
       await this.handleUpload(chatId);
-    } else if (text === 'Fetch' || text === 'Fetch Movie/Episode') {
-      await this.handleFetch(chatId);
-    } else if (text === '🎬 Open Streaming App') {
-      await this.sendMiniApp(chatId);
+    } else if (text === '/stats') {
+      await this.handleStats(chatId);
+    } else if (text === '/manage') {
+      await this.handleManage(chatId);
     }
 
     // Handle file uploads
@@ -86,37 +86,97 @@ export class Bot {
   }
 
   async sendMainMenu(chatId) {
+    // Simplified admin-only menu - no user streaming features
     const keyboard = {
       keyboard: [
-        ['Add New Title'],
-        ['Upload', 'Fetch Movie/Episode'],
-        ['🎬 Open Streaming App']
+        ['/add_movie', '/add_show'],
+        ['/upload', '/stats'],
+        ['/manage']
       ],
       resize_keyboard: true,
       one_time_keyboard: false
     };
 
-    const welcomeMessage = `🎬 Welcome to SparrowFlix!\n\n` +
-      `📁 Private storage channel configured\n` +
-      `🔒 Your content remains completely private\n\n` +
-      `Choose an option:`;
+    const welcomeMessage = `🎬 SparrowFlix Admin Bot\n\n` +
+      `📁 Content Management Interface\n` +
+      `Use the web app for streaming: ${this.env.MINI_APP_URL}\n\n` +
+      `Admin Commands:\n` +
+      `/add_movie - Add new movie\n` +
+      `/add_show - Add new TV show\n` +
+      `/upload - Upload content files\n` +
+      `/stats - View platform statistics\n` +
+      `/manage - Content management options`;
 
     await this.sendMessage(chatId, welcomeMessage, { reply_markup: keyboard });
   }
 
-  async sendMiniApp(chatId) {
-    const keyboard = {
-      inline_keyboard: [[
-        {
-          text: '🍿 Open SparrowFlix Streaming 🍿',
-          web_app: { url: 'https://jacobtordjman.github.io/SparrowFlix/' }
-        }
-      ]]
-    };
+  // Removed sendMiniApp - bot no longer handles user streaming interface
+  // Users should access the web app directly via MINI_APP_URL
 
-    await this.sendMessage(chatId, '🎬 Click below to open the streaming app:', { reply_markup: keyboard });
+  // New streamlined handlers - Phase 1.1 Component Role Clarification
+  async handleAddMovie(chatId) {
+    await this.sendMessage(chatId, 
+      '🎬 Add New Movie\n\n' +
+      'Send the movie details in this format:\n' +
+      'Title: Movie Name\n' +
+      'Year: 2023\n' +
+      'TMDB ID: 12345 (optional)'
+    );
+    await this.env.FILEPATH_CACHE.put(`state_${chatId}`, JSON.stringify({
+      action: 'add_movie',
+      step: 'awaiting_details'
+    }), { expirationTtl: 300 });
   }
 
+  async handleAddShow(chatId) {
+    await this.sendMessage(chatId, 
+      '📺 Add New TV Show\n\n' +
+      'Send the show details in this format:\n' +
+      'Title: Show Name\n' +
+      'Year: 2023\n' +
+      'Seasons: 3\n' +
+      'TMDB ID: 12345 (optional)'
+    );
+    await this.env.FILEPATH_CACHE.put(`state_${chatId}`, JSON.stringify({
+      action: 'add_show',
+      step: 'awaiting_details'
+    }), { expirationTtl: 300 });
+  }
+
+  async handleStats(chatId) {
+    try {
+      const stats = await this.db.getStats();
+      
+      await this.sendMessage(chatId,
+        `📊 Platform Statistics\n\n` +
+        `🎬 Movies: ${stats.movies}\n` +
+        `📺 TV Shows: ${stats.shows}\n` +
+        `🎞️ Episodes: ${stats.episodes}\n` +
+        `💾 Storage: Telegram Backup`
+      );
+    } catch (error) {
+      console.error('Stats error:', error);
+      await this.sendMessage(chatId, '❌ Error fetching statistics');
+    }
+  }
+
+  async handleManage(chatId) {
+    const keyboard = {
+      inline_keyboard: [
+        [{ text: '🗑️ Delete Content', callback_data: 'manage_delete' }],
+        [{ text: '📝 Edit Metadata', callback_data: 'manage_edit' }],
+        [{ text: '🔄 Refresh Cache', callback_data: 'manage_refresh' }]
+      ]
+    };
+    
+    await this.sendMessage(chatId, 
+      '⚙️ Content Management\n\n' +
+      'Choose a management option:',
+      { reply_markup: keyboard }
+    );
+  }
+
+  // Legacy method - will be removed in next cleanup
   async handleAddTitle(chatId) {
     const keyboard = {
       keyboard: [

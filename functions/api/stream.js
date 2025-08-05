@@ -34,31 +34,58 @@ async function getTelegramFileUrl(env, botToken, fileId) {
   }
 }
 
+import { D1Database } from '../db/d1-connection.js';
+import { SecureTicketSystem } from './secure-tickets.js';
+import { RateLimiter } from '../utils/rate-limiter.js';
+
 export async function handleStreamRequest(request, env) {
   const url = new URL(request.url);
   const ticketId = url.pathname.split('/').pop();
+  const hmacToken = url.searchParams.get('token');
 
   if (!ticketId) {
     return new Response('Ticket ID required', { status: 400 });
   }
 
-  const stored = await env.TICKETS.get(ticketId);
-  if (!stored) {
-    return new Response('Ticket not found', { status: 404 });
+  if (!hmacToken) {
+    return new Response('Security token required', { status: 400 });
   }
 
-  let ticket;
-  try {
-    ticket = JSON.parse(stored);
-  } catch (e) {
-    return new Response('Invalid ticket', { status: 400 });
+  // Initialize security systems
+  const db = new D1Database(env.DB);
+  const ticketSystem = new SecureTicketSystem(db, env.JWT_SECRET || 'fallback-secret');
+  const rateLimiter = new RateLimiter(db);
+  
+  // Extract client IP
+  const clientIP = request.headers.get('CF-Connecting-IP') || 
+                   request.headers.get('X-Forwarded-For') || 
+                   '127.0.0.1';
+
+  // Check IP blacklist
+  const blacklistCheck = await rateLimiter.isBlacklisted(clientIP);
+  if (blacklistCheck.blacklisted) {
+    return new Response(`Access denied: ${blacklistCheck.reason}`, { status: 403 });
   }
 
-  if (Date.now() > ticket.expiresAt) {
-    return new Response('Ticket expired', { status: 410 });
+  // Check streaming rate limits
+  const rateLimitResult = await rateLimiter.checkRateLimit(request, 'stream_access');
+  if (!rateLimitResult.allowed) {
+    return new Response(`Rate limit exceeded: ${rateLimitResult.reason}`, { 
+      status: 429,
+      headers: rateLimitResult.headers
+    });
   }
 
-  const fileId = ticket.fileId;
+  // Verify and consume ticket
+  const verification = await ticketSystem.verifyAndConsumeTicket(ticketId, hmacToken, clientIP);
+  
+  if (!verification.valid) {
+    console.log('Ticket verification failed:', verification.error);
+    return new Response(`Access denied: ${verification.error}`, { status: 403 });
+  }
+
+  const fileId = verification.fileId;
+  
   if (!fileId) {
     return new Response('File not available', { status: 404 });
   }

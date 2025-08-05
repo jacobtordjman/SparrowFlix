@@ -46,6 +46,10 @@ ENV/
 *.crt
 *.p12
 
+# Cloudflare Workers
+wrangler.toml           # Contains sensitive account IDs and tokens
+!wrangler.toml.example  # Keep template if exists
+
 # -----------------------
 # Logs, PIDs, runtime
 # -----------------------
@@ -100,14 +104,27 @@ legacey/render.yaml
 *.swp
 *~
 *.orig
-.env
-.wrangler
+
+# -----------------------
+# Cloudflare Workers specific
+# -----------------------
+.wrangler/
+.dev.vars               # Local development variables
+wrangler.toml           # Already covered above
+
+# -----------------------
+# Migration & deployment scripts
+# -----------------------
 set_worker_secrets.sh
 d1_migration_guide.sh
-schema.sql
-set_worker_secrets.sh
 migrate-mongodb-to-d1.js
 migrate.js
 migration_data_fixed.sql
 migration_data.sql
-migrate.js
+
+# -----------------------
+# Temporary files & media uploads
+# -----------------------
+uploads/
+temp/
+*.tmp.*
