@@ -1,8 +1,9 @@
-// functions/api/index.js - Updated with access control (Phase 2.2)
+// functions/api/index.js - Updated with caching system (Phase 6.1)
 import { D1Database } from '../db/d1-connection.js';
 import { AuthSystem, verifyTelegramWebAppData, createOrUpdateUser } from '../utils/auth-unified.js';
 import { RateLimiter } from '../utils/rate-limiter.js';
 import { AccessControl } from '../utils/access-control.js';
+import { CacheManager, ContentCache } from '../cache/cache-manager.js';
 import { handleChannelsApi } from './channels.js';
 import { handleTicketApi } from './ticket.js';
 import { HLSStreamer } from '../streaming/hls-streamer.js';
@@ -16,10 +17,12 @@ export async function handleApiRequest(request, env, path) {
   const apiPath = path.replace('/api/', '');
   const [resource, ...params] = apiPath.split('/');
 
-  // Initialize security systems
+  // Initialize systems
   const authSystem = new AuthSystem(env.JWT_SECRET || 'fallback-secret', db);
   const rateLimiter = new RateLimiter(db);
   const accessControl = new AccessControl(db);
+  const cacheManager = new CacheManager(env);
+  const contentCache = new ContentCache(cacheManager);
   
   // Extract client info for security
   const clientIP = request.headers.get('CF-Connecting-IP') || 
@@ -115,7 +118,7 @@ export async function handleApiRequest(request, env, path) {
         if (!contentAccess.allowed) {
           return createAccessDeniedResponse(contentAccess);
         }
-        response = await handleContentApi(request, db, params, user);
+        response = await handleContentApi(request, db, params, user, contentCache);
         break;
       
       case 'search':
@@ -124,7 +127,7 @@ export async function handleApiRequest(request, env, path) {
         if (!searchAccess.allowed) {
           return createAccessDeniedResponse(searchAccess);
         }
-        response = await handleSearchApi(request, db, url);
+        response = await handleSearchApi(request, db, url, contentCache);
         break;
       
       case 'user':
@@ -240,45 +243,52 @@ export async function handleApiRequest(request, env, path) {
 
 // Updated handleContentApi function for functions/api/index.js
 
-async function handleContentApi(request, db, params, user) {
+async function handleContentApi(request, db, params, user, contentCache) {
   const [type, id] = params;
   
   if (!type) {
-    // Get all content using native D1 queries
+    // Get all content with caching
     try {
-      console.log('Fetching content with native D1...');
+      console.log('Fetching content with caching...');
       
-      // Get movies with files
-      const movies = await db.getAllMovies();
-      const moviesWithFiles = movies.filter(movie => movie.file_id && movie.file_id.trim() !== '');
-      
-      console.log(`Found ${moviesWithFiles.length} movies with files`);
-      
-      // Get TV shows
-      const shows = await db.getAllShows();
-      console.log(`Found ${shows.length} TV shows`);
-      
-      // Get episodes and group by show
-      const showsWithEpisodes = await Promise.all(
-        shows.map(async (show) => {
-          const episodes = await db.getEpisodesByShow(show.id);
-          return {
-            ...show,
-            episodes: episodes.filter(ep => ep.file_id && ep.file_id.trim() !== '')
-          };
-        })
-      );
-      
-      const showsWithContent = showsWithEpisodes.filter(show => show.episodes.length > 0);
-      console.log(`Found ${showsWithContent.length} shows with episodes`);
-      
-      return {
-        body: JSON.stringify({
+      const allContent = await contentCache.cache.get('all_content', 'api_responses', async () => {
+        // Get movies with files
+        const movies = await db.getAllMovies();
+        const moviesWithFiles = movies.filter(movie => movie.file_id && movie.file_id.trim() !== '');
+        
+        console.log(`Found ${moviesWithFiles.length} movies with files`);
+        
+        // Get TV shows
+        const shows = await db.getAllShows();
+        console.log(`Found ${shows.length} TV shows`);
+        
+        // Get episodes and group by show
+        const showsWithEpisodes = await Promise.all(
+          shows.map(async (show) => {
+            const episodes = await db.getEpisodesByShow(show.id);
+            return {
+              ...show,
+              episodes: episodes.filter(ep => ep.file_id && ep.file_id.trim() !== '')
+            };
+          })
+        );
+        
+        const showsWithContent = showsWithEpisodes.filter(show => show.episodes.length > 0);
+        console.log(`Found ${showsWithContent.length} shows with episodes`);
+        
+        return {
           movies: moviesWithFiles.slice(0, 50).map(formatMovie),
           shows: showsWithContent.slice(0, 50).map(formatTVShow)
-        }),
+        };
+      });
+      
+      return {
+        body: JSON.stringify(allContent),
         status: 200,
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 
+          'Content-Type': 'application/json',
+          'Cache-Control': 'public, max-age=300' // 5 minutes client cache
+        }
       };
     } catch (error) {
       console.error('Content fetch error:', error);
@@ -295,7 +305,10 @@ async function handleContentApi(request, db, params, user) {
   }
 
   if (type === 'movie' && id) {
-    const movie = await db.getMovieById(id);
+    const movie = await contentCache.getMovie(id, async () => {
+      return await db.getMovieById(id);
+    });
+    
     if (!movie) {
       return {
         body: JSON.stringify({ error: 'Movie not found' }),
@@ -307,12 +320,23 @@ async function handleContentApi(request, db, params, user) {
     return {
       body: JSON.stringify(formatMovie(movie)),
       status: 200,
-      headers: { 'Content-Type': 'application/json' }
+      headers: { 
+        'Content-Type': 'application/json',
+        'Cache-Control': 'public, max-age=1800' // 30 minutes client cache
+      }
     };
   }
 
   if (type === 'show' && id) {
-    const show = await db.getShowById(id);
+    const show = await contentCache.getShow(id, async () => {
+      const showData = await db.getShowById(id);
+      if (!showData) return null;
+      
+      // Get episodes for the show
+      const episodes = await db.getEpisodesByShow(id);
+      return { ...showData, episodes };
+    });
+    
     if (!show) {
       return {
         body: JSON.stringify({ error: 'Show not found' }),
@@ -321,14 +345,13 @@ async function handleContentApi(request, db, params, user) {
       };
     }
     
-    // Get episodes for the show
-    const episodes = await db.getEpisodesByShow(id);
-    const showWithEpisodes = { ...show, episodes };
-    
     return {
-      body: JSON.stringify(formatTVShow(showWithEpisodes)),
+      body: JSON.stringify(formatTVShow(show)),
       status: 200,
-      headers: { 'Content-Type': 'application/json' }
+      headers: { 
+        'Content-Type': 'application/json',
+        'Cache-Control': 'public, max-age=1800' // 30 minutes client cache
+      }
     };
   }
 
@@ -339,10 +362,10 @@ async function handleContentApi(request, db, params, user) {
   };
 }
 
-async function handleSearchApi(request, db, url) {
+async function handleSearchApi(request, db, url, contentCache) {
   const query = url.searchParams.get('q');
   const type = url.searchParams.get('type');
-  const language = url.searchParams.get('language');
+  const limit = parseInt(url.searchParams.get('limit')) || 20;
   
   if (!query) {
     return {
@@ -352,37 +375,67 @@ async function handleSearchApi(request, db, url) {
     };
   }
 
-  const searchFilter = {
-    $text: { $search: query }
-  };
-  
-  if (language) {
-    searchFilter.language = language.toLowerCase();
-  }
+  try {
+    const searchResults = await contentCache.getSearchResults(query, { type, limit }, async () => {
+      const results = [];
+      const searchTerm = query.toLowerCase();
+      
+      if (!type || type === 'movie') {
+        const movies = await db.getAllMovies();
+        const matchingMovies = movies
+          .filter(movie => 
+            (movie.title && movie.title.toLowerCase().includes(searchTerm)) ||
+            (movie.genre && movie.genre.toLowerCase().includes(searchTerm)) ||
+            (movie.overview && movie.overview.toLowerCase().includes(searchTerm))
+          )
+          .slice(0, limit)
+          .map(m => ({ ...formatMovie(m), type: 'movie' }));
+        results.push(...matchingMovies);
+      }
+      
+      if (!type || type === 'show') {
+        const shows = await db.getAllShows();
+        const matchingShows = shows
+          .filter(show => 
+            (show.title && show.title.toLowerCase().includes(searchTerm)) ||
+            (show.genre && show.genre.toLowerCase().includes(searchTerm)) ||
+            (show.overview && show.overview.toLowerCase().includes(searchTerm))
+          )
+          .slice(0, limit);
+        
+        // Get episodes for matching shows
+        const showsWithEpisodes = await Promise.all(
+          matchingShows.map(async (show) => {
+            const episodes = await db.getEpisodesByShow(show.id);
+            return { ...show, episodes };
+          })
+        );
+        
+        results.push(...showsWithEpisodes.map(s => ({ ...formatTVShow(s), type: 'show' })));
+      }
+      
+      return { results: results.slice(0, limit) };
+    });
 
-  const results = [];
-  
-  if (!type || type === 'movie') {
-    const movies = await db.collection('movies')
-      .find(searchFilter)
-      .limit(20)
-      .toArray();
-    results.push(...movies.map(m => ({ ...formatMovie(m), type: 'movie' })));
+    return {
+      body: JSON.stringify(searchResults),
+      status: 200,
+      headers: { 
+        'Content-Type': 'application/json',
+        'Cache-Control': 'public, max-age=900' // 15 minutes client cache
+      }
+    };
+  } catch (error) {
+    console.error('Search error:', error);
+    return {
+      body: JSON.stringify({ 
+        error: 'Search failed',
+        details: error.message 
+      }),
+      status: 500,
+      headers: { 'Content-Type': 'application/json' }
+    };
   }
-  
-  if (!type || type === 'show') {
-    const shows = await db.collection('tv_shows')
-      .find(searchFilter)
-      .limit(20)
-      .toArray();
-    results.push(...shows.map(s => ({ ...formatTVShow(s), type: 'show' })));
-  }
-
-  return {
-    body: JSON.stringify({ results }),
-    status: 200,
-    headers: { 'Content-Type': 'application/json' }
-  };
 }
 
 async function handleUserApi(request, db, user) {

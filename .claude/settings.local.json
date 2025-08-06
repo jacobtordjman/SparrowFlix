@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(wrangler d1 execute:*)",
+      "Bash(wrangler deploy:*)",
+      "Bash(npm run build:*)",
+      "Bash(npm run:*)",
+      "Bash(npm install)",
+      "Bash(rm:*)",
+      "Bash(npm install:*)",
+      "Bash(cp:*)"
+    ],
+    "deny": []
+  }
+}

@@ -1,0 +1,536 @@
+/* Netflix-Style Header CSS */
+
+.netflix-header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.7) 10%, transparent);
+  transition: background-color 0.4s ease;
+  padding: 0;
+}
+
+.netflix-header--scrolled {
+  background-color: rgba(0, 0, 0, 0.95);
+  backdrop-filter: blur(10px);
+}
+
+.netflix-header__container {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 4% 0 4%;
+  height: 70px;
+  max-width: 1920px;
+  margin: 0 auto;
+}
+
+/* Logo */
+.netflix-header__brand {
+  flex-shrink: 0;
+}
+
+.netflix-header__logo {
+  text-decoration: none;
+}
+
+.netflix-header__logo-text {
+  color: #e50914;
+  font-size: 28px;
+  font-weight: 900;
+  letter-spacing: -1px;
+  text-transform: uppercase;
+}
+
+/* Main Navigation */
+.netflix-header__nav {
+  flex: 1;
+  margin-left: 40px;
+}
+
+.netflix-header__nav-list {
+  display: flex;
+  align-items: center;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  gap: 24px;
+}
+
+.netflix-header__nav-item {
+  position: relative;
+}
+
+.netflix-header__nav-link {
+  color: #ffffff;
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 400;
+  transition: color 0.3s ease;
+  position: relative;
+  padding: 8px 0;
+}
+
+.netflix-header__nav-link:hover {
+  color: #b3b3b3;
+}
+
+.netflix-header__nav-link--active {
+  color: #ffffff;
+  font-weight: 500;
+}
+
+.netflix-header__nav-link--active::after {
+  content: '';
+  position: absolute;
+  bottom: -8px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background-color: #e50914;
+  border-radius: 1px;
+}
+
+/* Secondary Navigation */
+.netflix-header__secondary {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+/* Search */
+.netflix-header__search {
+  position: relative;
+}
+
+.netflix-header__search-toggle {
+  background: none;
+  border: none;
+  color: #ffffff;
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 4px;
+  transition: background-color 0.3s ease;
+}
+
+.netflix-header__search-toggle:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.netflix-header__search-icon {
+  width: 24px;
+  height: 24px;
+  fill: currentColor;
+}
+
+.netflix-header__search-container {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  width: 300px;
+  margin-top: 10px;
+}
+
+.netflix-header__search-form {
+  position: relative;
+}
+
+.netflix-header__search-input {
+  width: 100%;
+  background-color: rgba(0, 0, 0, 0.85);
+  border: 2px solid #333333;
+  border-radius: 4px;
+  color: #ffffff;
+  font-size: 14px;
+  padding: 12px 16px;
+  transition: border-color 0.3s ease;
+}
+
+.netflix-header__search-input:focus {
+  outline: none;
+  border-color: #ffffff;
+}
+
+.netflix-header__search-input::placeholder {
+  color: #b3b3b3;
+}
+
+.netflix-header__search-results {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background-color: rgba(0, 0, 0, 0.95);
+  border: 1px solid #333333;
+  border-radius: 4px;
+  margin-top: 2px;
+  max-height: 400px;
+  overflow-y: auto;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+}
+
+.netflix-header__search-loading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  color: #b3b3b3;
+}
+
+.netflix-header__search-result {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  cursor: pointer;
+  border-bottom: 1px solid #333333;
+  transition: background-color 0.3s ease;
+}
+
+.netflix-header__search-result:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.netflix-header__search-result:last-child {
+  border-bottom: none;
+}
+
+.netflix-header__search-result-poster {
+  width: 40px;
+  height: 60px;
+  flex-shrink: 0;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.netflix-header__search-result-poster img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.netflix-header__search-result-info {
+  flex: 1;
+}
+
+.netflix-header__search-result-info h4 {
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 500;
+  margin: 0 0 4px 0;
+}
+
+.netflix-header__search-result-info p {
+  color: #b3b3b3;
+  font-size: 12px;
+  margin: 0;
+}
+
+.netflix-header__search-result--view-all {
+  background-color: rgba(229, 9, 20, 0.1);
+  border-color: rgba(229, 9, 20, 0.3);
+}
+
+.netflix-header__search-result--view-all:hover {
+  background-color: rgba(229, 9, 20, 0.2);
+}
+
+/* Notifications */
+.netflix-header__notifications {
+  position: relative;
+}
+
+.netflix-header__notifications-toggle {
+  position: relative;
+  background: none;
+  border: none;
+  color: #ffffff;
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 4px;
+  transition: background-color 0.3s ease;
+}
+
+.netflix-header__notifications-toggle:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.netflix-header__notifications-icon {
+  width: 24px;
+  height: 24px;
+  fill: currentColor;
+}
+
+.netflix-header__notifications-badge {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  background-color: #e50914;
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 700;
+  border-radius: 10px;
+  padding: 2px 6px;
+  min-width: 16px;
+  text-align: center;
+}
+
+.netflix-header__notifications-dropdown {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  width: 350px;
+  background-color: rgba(0, 0, 0, 0.95);
+  border: 1px solid #333333;
+  border-radius: 8px;
+  margin-top: 10px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+  max-height: 400px;
+  overflow: hidden;
+}
+
+.netflix-header__notifications-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid #333333;
+}
+
+.netflix-header__notifications-header h3 {
+  color: #ffffff;
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.netflix-header__notifications-list {
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.netflix-header__notification-item {
+  padding: 16px 20px;
+  border-bottom: 1px solid #333333;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+.netflix-header__notification-item:hover {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+.netflix-header__notification-item:last-child {
+  border-bottom: none;
+}
+
+.netflix-header__notification-item--unread {
+  background-color: rgba(229, 9, 20, 0.1);
+  border-left: 3px solid #e50914;
+}
+
+.netflix-header__notification-content h4 {
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 500;
+  margin: 0 0 4px 0;
+}
+
+.netflix-header__notification-content p {
+  color: #b3b3b3;
+  font-size: 13px;
+  margin: 0 0 8px 0;
+  line-height: 1.4;
+}
+
+.netflix-header__notification-time {
+  color: #999999;
+  font-size: 11px;
+}
+
+.netflix-header__notifications-empty {
+  padding: 40px 20px;
+  text-align: center;
+}
+
+.netflix-header__notifications-empty p {
+  color: #b3b3b3;
+  font-size: 14px;
+  margin: 0;
+}
+
+/* Profile Menu */
+.netflix-header__profile {
+  position: relative;
+}
+
+.netflix-header__profile-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  transition: background-color 0.3s ease;
+}
+
+.netflix-header__profile-toggle:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.netflix-header__profile-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 4px;
+  object-fit: cover;
+}
+
+.netflix-header__profile-arrow {
+  width: 16px;
+  height: 16px;
+  fill: #ffffff;
+  transition: transform 0.3s ease;
+}
+
+.netflix-header__profile-toggle[aria-expanded="true"] .netflix-header__profile-arrow {
+  transform: rotate(180deg);
+}
+
+.netflix-header__profile-dropdown {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  width: 280px;
+  background-color: rgba(0, 0, 0, 0.95);
+  border: 1px solid #333333;
+  border-radius: 8px;
+  margin-top: 10px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+  overflow: hidden;
+}
+
+.netflix-header__profile-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 20px;
+  border-bottom: 1px solid #333333;
+}
+
+.netflix-header__profile-dropdown-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 6px;
+  object-fit: cover;
+}
+
+.netflix-header__profile-header h4 {
+  color: #ffffff;
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0 0 4px 0;
+}
+
+.netflix-header__profile-header p {
+  color: #b3b3b3;
+  font-size: 13px;
+  margin: 0;
+}
+
+.netflix-header__profile-menu {
+  padding: 8px 0;
+}
+
+.netflix-header__profile-menu-item {
+  display: block;
+  width: 100%;
+  padding: 12px 20px;
+  color: #ffffff;
+  text-decoration: none;
+  font-size: 14px;
+  border: none;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+.netflix-header__profile-menu-item:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.netflix-header__profile-menu-item--logout {
+  color: #e50914;
+  border-top: 1px solid #333333;
+}
+
+.netflix-header__profile-menu-divider {
+  height: 1px;
+  background-color: #333333;
+  margin: 8px 0;
+}
+
+/* Spinner for loading states */
+.spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid #333333;
+  border-top: 2px solid #ffffff;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Mobile Responsive */
+@media (max-width: 768px) {
+  .netflix-header__container {
+    padding: 0 20px;
+    height: 60px;
+  }
+  
+  .netflix-header__logo-text {
+    font-size: 24px;
+  }
+  
+  .netflix-header__nav {
+    display: none;
+  }
+  
+  .netflix-header__search-container {
+    width: 280px;
+  }
+  
+  .netflix-header__notifications-dropdown,
+  .netflix-header__profile-dropdown {
+    width: 300px;
+    right: -20px;
+  }
+}
+
+@media (max-width: 480px) {
+  .netflix-header__container {
+    padding: 0 16px;
+  }
+  
+  .netflix-header__logo-text {
+    font-size: 20px;
+  }
+  
+  .netflix-header__secondary {
+    gap: 12px;
+  }
+  
+  .netflix-header__search-container {
+    width: 260px;
+  }
+  
+  .netflix-header__notifications-dropdown,
+  .netflix-header__profile-dropdown {
+    width: calc(100vw - 32px);
+    right: 0;
+  }
+}

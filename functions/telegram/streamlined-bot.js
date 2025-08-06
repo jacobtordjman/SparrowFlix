@@ -451,13 +451,13 @@ export class StreamlinedBot {
       ]
     };
 
-    const message = `📁 **File Received**\n\n` +
-                   `**Name**: ${file.file_name || 'Unknown'}\n` +
-                   `**Size**: ${this.formatBytes(file.file_size)}\n` +
-                   `**Type**: ${file.mime_type || 'Unknown'}\n\n` +
-                   `What type of content is this file?`;
+    const responseMessage = `📁 **File Received**\n\n` +
+                           `**Name**: ${file.file_name || 'Unknown'}\n` +
+                           `**Size**: ${this.formatBytes(file.file_size)}\n` +
+                           `**Type**: ${file.mime_type || 'Unknown'}\n\n` +
+                           `What type of content is this file?`;
 
-    await this.sendMessage(chatId, message, { reply_markup: keyboard });
+    await this.sendMessage(chatId, responseMessage, { reply_markup: keyboard });
   }
 
   /**
